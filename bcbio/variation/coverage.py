@@ -3,6 +3,7 @@
 Handles identification of low coverage regions in defined genes of interest or the entire transcript.
 """
 import collections
+import copy
 import os
 
 import yaml
@@ -65,12 +66,15 @@ def summary(samples, config):
         bc_jar = config_utils.get_jar("bcbio.coverage", config_utils.get_program("bcbio_coverage", config, "dir"))
     except ValueError:
         logger.warning("No coverage calculations: Did not find bcbio.coverage jar from system config")
-        return
+        return [[x] for x in samples]
     config_file, out_file = _prep_coverage_config(samples, config)
     tmp_dir = utils.safe_makedir(os.path.join(os.path.dirname(out_file), "tmp"))
     resources = config_utils.get_resources("bcbio_coverage", config)
-    jvm_opts = resources.get("jvm_opts", ["-Xms750m", "-Xmx2g"])
-    java_args = ["-Djava.io.tmpdir=%s" % tmp_dir]
+    config = copy.deepcopy(config)
+    config["algorithm"]["memory_adjust"] = {"direction": "increase",
+                                            "magnitude": config["algorithm"]["num_cores"]}
+    jvm_opts = config_utils.adjust_opts(resources.get("jvm_opts", ["-Xms750m", "-Xmx2g"]), config)
+    java_args = ["-Djava.io.tmpdir=%s" % tmp_dir, "-Djava.awt.headless=true"]
     cmd = ["java"] + jvm_opts + java_args + ["-jar", bc_jar, "multicompare", config_file,
                                              out_file, "-c", str(config["algorithm"]["num_cores"])]
     do.run(cmd, "Summarizing coverage with bcbio.coverage", samples[0])

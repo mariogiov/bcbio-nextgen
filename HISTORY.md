@@ -1,4 +1,22 @@
-## 0.7.1 (in progress)
+## 0.7.2 (in progress)
+
+- Drop requirement for fc_name and fc_date in input YAML file. Individual sample
+  names are instead used and required to be unique within a processing run.
+- Remove original `variant` pipeline, replacing with the all around better
+  `variant2` analysis method. Plan for the next version is to automatically
+  redirect to `variant2`.
+- Improve parallelization of BAM preparation and gemini database creation by
+  moving to multicore versions.
+- Remove sequencer-specific integration functionality which is poorly maintained
+  and better done with third party tools: demultiplexing and statistics from
+  Illumina directories.
+- Bug fix to re-enable template generation functionality.
+- Improve BAM merging on large files using samtools for output sort.
+- Uploading results works with the RNA-seq pipeline.
+- Rework internals to provide a consistent dictionary of sample attributes up
+  front, avoiding lane/sample dichotomy which provided confusing internal code.
+
+## 0.7.1 (August 12, 2013)
 
 - Remove requirement for bcbio_system.yaml passed in on command line, defaulting
   to default file prepared by installer unless specified.

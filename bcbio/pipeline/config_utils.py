@@ -21,7 +21,7 @@ def update_w_custom(config, lane_info):
     config = copy.deepcopy(config)
     base_name = lane_info.get("analysis")
     for analysis_type in name_remaps.get(base_name, [base_name]):
-        custom = config["custom_algorithms"].get(analysis_type, None)
+        custom = config.get("custom_algorithms", {}).get(analysis_type)
         if custom:
             for key, val in custom.iteritems():
                 config["algorithm"][key] = val
@@ -173,6 +173,35 @@ def get_jar(base_name, dname):
     else:
         raise ValueError("Could not find java jar %s in %s" %
                          (base_name, dname))
+
+def adjust_memory(val, magnitude, direction="increase"):
+    """Adjust memory based on number of cores utilized.
+    """
+    modifier = val[-1:]
+    amount = int(val[:-1])
+    if direction == "decrease":
+        amount = amount / magnitude
+    elif direction == "increase":
+        amount = amount * magnitude
+    return "{amount}{modifier}".format(amount=amount, modifier=modifier)
+
+def adjust_opts(in_opts, config):
+    """Establish JVM opts, adjusting memory for the context if needed.
+
+    This allows using less or more memory for highly parallel or multicore
+    supporting processes, respectively.
+    """
+    memory_adjust = config["algorithm"].get("memory_adjust", {})
+    out_opts = []
+    for opt in in_opts:
+        if opt.startswith(("-Xmx", "-Xms")):
+            arg = opt[:4]
+            opt = "{arg}{val}".format(arg=arg,
+                                      val=adjust_memory(opt[4:],
+                                                        memory_adjust.get("magnitude", 1),
+                                                        memory_adjust.get("direction")))
+        out_opts.append(opt)
+    return out_opts
 
 ## functions for navigating through the standard galaxy directory of files
 

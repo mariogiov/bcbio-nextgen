@@ -15,10 +15,7 @@ from bcbio.rnaseq import qc
 from bcbio.distributed.messaging import parallel_runner
 from bcbio.distributed.ipython import global_parallel
 from bcbio.log import logger
-from bcbio.pipeline.run_info import get_run_info
-from bcbio.pipeline.demultiplex import add_multiplex_across_lanes
-from bcbio.pipeline.merge import organize_samples
-from bcbio.pipeline import lane, region, qcsummary
+from bcbio.pipeline import lane, region, run_info, qcsummary, version
 from bcbio.provenance import programs
 from bcbio.solexa.flowcell import get_fastq_dir
 from bcbio.variation.realign import parallel_realign_sample
@@ -35,43 +32,39 @@ def run_main(config, config_file, work_dir, parallel,
     """
     parallel = log.create_base_logger(config, parallel)
     log.setup_local_logging(config, parallel)
-    fc_name, fc_date, run_info = get_run_info(fc_dir, config, run_info_yaml)
     fastq_dir, galaxy_dir, config_dir = _get_full_paths(get_fastq_dir(fc_dir)
                                                         if fc_dir else None,
                                                         config, config_file)
     config_file = os.path.join(config_dir, os.path.basename(config_file))
     dirs = {"fastq": fastq_dir, "galaxy": galaxy_dir,
             "work": work_dir, "flowcell": fc_dir, "config": config_dir}
+    run_items = run_info.organize(dirs, config, run_info_yaml)
     run_parallel = parallel_runner(parallel, dirs, config, config_file)
 
     # process each flowcell lane
-    run_items = add_multiplex_across_lanes(run_info["details"],
-                                           dirs["fastq"], fc_name)
-    lanes = ((info, fc_name, fc_date, dirs, config) for info in run_items)
-    lane_items = lane.process_all_lanes(lanes, run_parallel)
+    lane_items = lane.process_all_lanes(run_items, run_parallel)
     pipelines = _pair_lanes_with_pipelines(lane_items)
+    final = []
     for pipeline, pipeline_items in pipelines.items():
         pipeline_items = _add_provenance(pipeline_items, dirs, config)
         for xs in pipeline.run(config, config_file, run_parallel, parallel, dirs, pipeline_items):
             if len(xs) == 1:
                 upload.from_sample(xs[0])
-    qcsummary.write_metrics(run_info, fc_name, fc_date, dirs)
+                final.append(xs[0])
+    qcsummary.write_metrics(final, dirs)
 
 def _add_provenance(items, dirs, config):
     p = programs.write_versions(dirs, config)
     out = []
-    for item_info in items:
-        item = item_info[2]
-        if item.get("upload"):
+    for item in items:
+        if item.get("upload") and item["upload"].get("fc_name"):
             entity_id = "%s.%s.%s" % (item["upload"]["fc_date"],
                                       item["upload"]["fc_name"],
                                       item["description"])
         else:
             entity_id = item["description"]
         item["provenance"] = {"programs": p, "entity": entity_id}
-        cur = list(item_info)
-        cur[2] = item
-        out.append(cur)
+        out.append([item])
     return out
 
 # ## Utility functions
@@ -116,6 +109,8 @@ def parse_cl_args(in_args):
         parser.add_argument("-u", "--upgrade", help="Perform an upgrade of bcbio_nextgen in place.",
                             choices = ["stable", "development", "system"])
         parser.add_argument("-w", "--workflow", help="Run a workflow with the given commandline arguments")
+        parser.add_argument("-v", "--version", help="Print current version",
+                            action="store_true")
     args = parser.parse_args(in_args)
     if hasattr(args, "fc_dir"):
         kwargs = {"numcores": args.numcores if args.numcores > 0 else None,
@@ -164,6 +159,12 @@ def _add_inputs_to_kwargs(args, kwargs, parser):
             fc_dir, run_info_yaml = inputs
     elif len(inputs) == 3:
         global_config, fc_dir, run_info_yaml = inputs
+    elif kwargs.get("workflow", "") == "template":
+        kwargs["inputs"] = inputs
+        return kwargs
+    elif args.version:
+        print version.__version__
+        sys.exit()
     else:
         print "Incorrect input arguments", inputs
         parser.print_help()
@@ -212,6 +213,8 @@ class VariantPipeline(AbstractPipeline):
 
     @classmethod
     def run(self, config, config_file, run_parallel, parallel, dirs, lane_items):
+        raise NotImplementedError("`variant` processing is deprecated: please use `variant2`"
+                                  "The next version will alias variant to the new variant2 pipeline")
         lane_items = run_parallel("trim_lane", lane_items)
         align_items = run_parallel("process_alignment", lane_items)
         # process samples, potentially multiplexed across multiple lanes
@@ -269,16 +272,20 @@ class Variant2Pipeline(AbstractPipeline):
             samples = combine_multiple_callers(samples)
             logger.info("Timing: ensemble calling")
             samples = ensemble.combine_calls_parallel(samples, run_parallel)
-            logger.info("Timing: prepped BAM merging")
-            samples = region.delayed_bamprep_merge(samples, run_parallel)
             logger.info("Timing: validation")
             samples = run_parallel("compare_to_rm", samples)
             samples = validate.summarize_grading(samples)
-            logger.info("Timing: population database")
-            samples = population.prep_db_parallel(samples, run_parallel)
             logger.info("Timing: quality control")
             samples = qcsummary.generate_parallel(samples, run_parallel)
-            logger.info("Timing: finished")
+        ## Finalizing BAMs and population databases, handle multicore computation
+        with global_parallel(parallel, "multicore2", ["prep_gemini_db"],
+                             samples, dirs["work"], config) as parallel:
+            run_parallel = parallel_runner(parallel, dirs, config)
+            logger.info("Timing: prepped BAM merging")
+            samples = region.delayed_bamprep_merge(samples, run_parallel)
+            logger.info("Timing: population database")
+            samples = population.prep_db_parallel(samples, run_parallel)
+        logger.info("Timing: finished")
         return samples
 
 class SNPCallingPipeline(VariantPipeline):
@@ -298,21 +305,18 @@ class RnaseqPipeline(AbstractPipeline):
     @classmethod
     def run(self, config, config_file, run_parallel, parallel, dirs, lane_items):
         lane_items = run_parallel("trim_lane", lane_items)
-        align_items = run_parallel("process_alignment", lane_items)
-        # process samples, potentially multiplexed across multiple lanes
-        samples = organize_samples(align_items, dirs, config_file)
-        samples = run_parallel("merge_sample", samples)
+        samples = run_parallel("process_alignment", lane_items)
         samples = run_parallel("generate_transcript_counts", samples)
         samples = qcsummary.generate_parallel(samples, run_parallel)
         samples = qc.sample_summary(samples)
         #run_parallel("generate_bigwig", samples, {"programs": ["ucsc_bigwig"]})
         return samples
 
-def _get_pipeline(lane_item):
+def _get_pipeline(item):
     from bcbio.log import logger
     SUPPORTED_PIPELINES = {x.name: x for x in
                            utils.itersubclasses(AbstractPipeline)}
-    analysis_type = lane_item[2].get("analysis")
+    analysis_type = item.get("analysis")
     if analysis_type not in SUPPORTED_PIPELINES:
         logger.error("Cannot determine which type of analysis to run, "
                       "set in the run_info under details.")
