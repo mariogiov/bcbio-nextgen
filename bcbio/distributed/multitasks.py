@@ -11,6 +11,10 @@ def process_lane(*args):
     return lane.process_lane(*args)
 
 @utils.map_wrap
+def quality_check(*args):
+    return qcsummary.check_run_quality(*args)
+
+@utils.map_wrap
 def trim_lane(*args):
     return lane.trim_lane(*args)
 
@@ -31,6 +35,7 @@ def merge_sample(*args):
 @utils.map_wrap
 def delayed_bam_merge(*args):
     return sample.delayed_bam_merge(*args)
+delayed_bam_merge.metadata = {"resources": ["samtools"]}
 
 @utils.map_wrap
 def piped_bamprep(*args):
@@ -56,6 +61,7 @@ def split_variants_by_sample(*args):
 @utils.map_wrap
 def postprocess_variants(*args):
     return variation.postprocess_variants(*args)
+postprocess_variants.metadata = {"resources": ["gatk-vqsr", "gatk", "snpEff"]}
 
 @utils.map_wrap
 def pipeline_summary(*args):
@@ -76,6 +82,7 @@ def combine_bam(*args):
 @utils.map_wrap
 def variantcall_sample(*args):
     return genotype.variantcall_sample(*args)
+variantcall_sample.metadata = {"resources": ["gatk", "freebayes", "gatk-haplotype"]}
 
 @utils.map_wrap
 def combine_variant_files(*args):
