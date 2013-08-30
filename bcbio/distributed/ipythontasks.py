@@ -6,6 +6,7 @@ from IPython.parallel import require
 
 from bcbio.distributed import ipython
 from bcbio.pipeline import sample, lane, qcsummary, shared, variation
+from bcbio.provenance import system
 from bcbio.variation import (bamprep, coverage, realign, genotype, ensemble, multi, population,
                              recalibrate, validate, vcfutils)
 from bcbio.log import logger, setup_local_logging
@@ -101,6 +102,7 @@ def piped_bamprep(*args):
 def postprocess_variants(*args):
     with _setup_logging(args):
         return apply(variation.postprocess_variants, *args)
+postprocess_variants.metadata = {"resources": ["gatk-vqsr", "gatk", "snpEff"]}
 
 @require(qcsummary)
 def pipeline_summary(*args):
@@ -126,6 +128,7 @@ def combine_bam(*args):
 def variantcall_sample(*args):
     with _setup_logging(args):
         return apply(genotype.variantcall_sample, *args)
+variantcall_sample.metadata = {"resources": ["gatk", "freebayes", "gatk-haplotype"]}
 
 @require(vcfutils)
 def combine_variant_files(*args):
@@ -163,3 +166,7 @@ def coverage_summary(*args):
     with _setup_logging(args):
         return apply(coverage.summary, *args)
 coverage_summary.metadata = {"resources": ["bcbio_coverage"]}
+
+@require(system)
+def machine_info(*args):
+    return system.machine_info()

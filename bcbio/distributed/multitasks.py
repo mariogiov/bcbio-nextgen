@@ -61,6 +61,7 @@ def split_variants_by_sample(*args):
 @utils.map_wrap
 def postprocess_variants(*args):
     return variation.postprocess_variants(*args)
+postprocess_variants.metadata = {"resources": ["gatk-vqsr", "gatk", "snpEff"]}
 
 @utils.map_wrap
 def pipeline_summary(*args):
@@ -81,6 +82,7 @@ def combine_bam(*args):
 @utils.map_wrap
 def variantcall_sample(*args):
     return genotype.variantcall_sample(*args)
+variantcall_sample.metadata = {"resources": ["gatk", "freebayes", "gatk-haplotype"]}
 
 @utils.map_wrap
 def combine_variant_files(*args):

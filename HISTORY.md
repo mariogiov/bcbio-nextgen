@@ -1,5 +1,12 @@
 ## 0.7.2 (in progress)
 
+- Report memory usage for processes to cluster schedulers and use predicted
+  memory usage to schedule cores per machine. Gets core and memory information
+  for machines and uses to ensure submitted jobs can schedule with available
+  resources.
+- Provide error checking of input YAML configuration at run start. Avoids
+  accidental typos or incorrect settings that won't error out until later in the
+  process.
 - Drop requirement for fc_name and fc_date in input YAML file. Individual sample
   names are instead used and required to be unique within a processing run.
 - Remove original `variant` pipeline, replacing with the all around better
@@ -7,6 +14,8 @@
   redirect to `variant2`.
 - Improve parallelization of BAM preparation and gemini database creation by
   moving to multicore versions.
+- Move variant annotation to work on called sub-regions, to avoid bottlenecks
+  when annotating a full whole genome VCF.
 - Remove sequencer-specific integration functionality which is poorly maintained
   and better done with third party tools: demultiplexing and statistics from
   Illumina directories.
@@ -15,6 +24,8 @@
 - Uploading results works with the RNA-seq pipeline.
 - Rework internals to provide a consistent dictionary of sample attributes up
   front, avoiding lane/sample dichotomy which provided confusing internal code.
+- Drop calling htseq-count from the command line in favor of an internal
+  implementation.
 
 ## 0.7.1 (August 12, 2013)
 
