@@ -2,7 +2,7 @@
 galaxy_config: $HOME/scilife_bcbb/tests/data/automated/universe_wsgi.ini
 
 algorithm:
-  aligner: bowtie22
+  aligner: bowtie2
   max_errors: 2
   num_cores: 1
   platform: illumina
