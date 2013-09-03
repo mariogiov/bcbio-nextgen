@@ -9,19 +9,13 @@ algorithm:
   recalibrate: false
   save_diskspace: true
   upload_fastq: false
-  snpcall: false
-  bc_mismatch: 2
-  bc_read: 1
-  bc_position: 3
-  bc_illumina_no_trailing: true
 
 # configuration algorithm changes for custom post-processing steps
 custom_algorithms:
   variant:
     aligner: bwa
-    #recalibrate: true
     recalibrate: gatk
-    snpcall: true
+    variantcaller: gatk
     coverage_depth: "low" # other options: high
     coverage_interval: "exome" # other options: genome
     dbsnp: variation/dbsnp_132.vcf
