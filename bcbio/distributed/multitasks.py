@@ -11,6 +11,10 @@ def process_lane(*args):
     return lane.process_lane(*args)
 
 @utils.map_wrap
+def quality_check(*args):
+    return qcsummary.check_run_quality(*args)
+
+@utils.map_wrap
 def trim_lane(*args):
     return lane.trim_lane(*args)
 

@@ -50,6 +50,15 @@ def pipeline_summary(data):
         data["summary"] = generate_align_summary(work_bam, data)
     return [[data]]
 
+
+def check_run_quality(data):
+    """ Run fastqc only on raw fastq files """
+    print "I am here and I am pretty satisfied"
+    if "summary" not in data:
+        data["summary"]= {}
+    return [[data]]
+
+
 def generate_align_summary(bam_file, data):
     if data["analysis"].lower() == "rna-seq":
         return rnaseq_align_summary(bam_file, data["sam_ref"],
