@@ -66,16 +66,16 @@ resources:
     cores: 8
     dir: $PICARD_HOME
   snpEff:
-    dir: $SNPEFF_HOME 
+    dir: $SNPEFF_HOME
     jvm_opts: ["-Xms750m", "-Xmx3g"]
   varscan:
-    dir: $VARSCAN_HOME 
+    dir: $VARSCAN_HOME
   mutect:
-    dir: $MUTECT_HOME 
+    dir: $MUTECT_HOME
 #  cram:
 #    dir: /usr/local/share/java/cram
   rnaseqc:
-    dir: $RNASEQC_HOME 
+    dir: $RNASEQC_HOME
 #  stampy:
 #    dir: ~/install/stampy-1.0.18
 #  cortex:
