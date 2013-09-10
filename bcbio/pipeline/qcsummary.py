@@ -56,6 +56,28 @@ def check_run_quality(data):
     print "I am here and I am pretty satisfied"
     if "summary" not in data:
         data["summary"]= {}
+    import pdb; pdb.set_trace()
+
+    fastq1, fastq2 = data["files"]
+    config = data["config"]
+    
+    dirs = data["dirs"]
+    qc_dir = utils.safe_makedir(os.path.join(dirs["work"], "qc"))
+    
+    with utils.curdir_tmpdir() as tmp_dir:
+        fastqc_graphs, fastqc_stats, fastqc_overrep = \
+            fastqc_report_fastqOnly(fastq1, fastq2, qc_dir, config)
+
+
+    with utils.chdir(qc_dir):
+        return {"pdf": _generate_pdf(graphs, summary, overrep, bam_file, sample_name,
+                                     qc_dir, config),
+                "metrics": summary}
+
+
+
+    summary_csv = write_project_summary(sum_samples)
+
     return [[data]]
 
 
@@ -231,6 +253,15 @@ def is_paired(bam_file):
 
 # ## Run and parse read information from FastQC
 
+def fastqc_report_fastqOnly(fastq1, fastq2, qc_dir, config):
+    """Calculate statistics about paired fastq files using FastQC.
+    """
+    out_dir = _run_fastqc_fastqOnly(fastq1, fastq2, qc_dir, config)
+    parser = FastQCParser(out_dir)
+    graphs = parser.get_fastqc_graphs()
+    stats, overrep = parser.get_fastqc_summary()
+    return graphs, stats, overrep
+
 def fastqc_report(bam_file, qc_dir, config):
     """Calculate statistics about a read using FastQC.
     """
@@ -307,6 +338,20 @@ def _run_fastqc(bam_file, qc_dir, config):
     if os.path.exists("%s.zip" % fastqc_out):
         os.remove("%s.zip" % fastqc_out)
     return fastqc_out
+
+def _run_fastqc_fastqOnly(fastq1, fastq2, qc_dir, config):
+    out_base = utils.safe_makedir(os.path.join(qc_dir, "fastqc"))
+    fastqc_out = os.path.join(out_base, "%s_fastqc" %
+                              os.path.splitext(os.path.basename(fastq1))[0])
+    """TODO output for second fastq file must be inserted"""
+    if not os.path.exists(fastqc_out):
+        cl = [config_utils.get_program("fastqc", config), "-o", out_base, "-f", "fastq", fastq1, fastq2]
+        subprocess.check_call(cl)
+    if os.path.exists("%s.zip" % fastqc_out):
+        os.remove("%s.zip" % fastqc_out)
+    return fastqc_out
+
+
 
 # ## High level summary in YAML format for loading into Galaxy.
 
