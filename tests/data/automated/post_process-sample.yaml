@@ -1,8 +1,6 @@
-#galaxy_config: universe_wsgi.ini
-galaxy_config: $HOME/scilife_bcbb/tests/data/automated/universe_wsgi.ini
-
+galaxy_config: universe_wsgi.ini
 algorithm:
-  aligner: bowtie2
+  aligner: bowtie
   max_errors: 2
   num_cores: 1
   platform: illumina
@@ -15,18 +13,12 @@ custom_algorithms:
   variant:
     aligner: bwa
     recalibrate: gatk
-    variantcaller: gatk
+    snpcall: true
     coverage_depth: "low" # other options: high
     coverage_interval: "exome" # other options: genome
-    dbsnp: variation/dbsnp_132.vcf
-    train_hapmap: variation/hapmap_3.3.vcf
-    train_1000g_omni: variation/1000G_omni2.5.vcf
-    train_indels: variation/Mills_Devine_2hit.indels.vcf
   'RNA-seq':
-    #aligner: tophat2
-    #transcript_assemble: true
-    transcripts: rnaseq/ref-transcripts.gtf
-    transcripts_mask: rnaseq/ref-transcripts-mask.gtf
+    aligner: tophat2
+    transcript_assemble: true
   'Minimal':
     aligner: ""
 # Define resources to be used for individual programs on multicore machines.
@@ -43,25 +35,25 @@ resources:
   ucsc_bigwig:
     memory: 36g
   bowtie:
-    cores: 8
+    cores:
   tophat:
-    cores: 8
+    cores:
   bwa:
-    cores: 8
+    cores: 4
   samtools:
-    cores: 8
+    cores: 4
     memory: 1G
-#  novoalign:
-#    cores: 4
-#    memory: 4G
+  novoalign:
+    cores: 4
+    memory: 4G
   gemini:
-    cores: 8
+    cores: 4
   gatk:
     cores: 8
     dir: $GATK_HOME
     jvm_opts: ["-Xms750m", "-Xmx2000m"]
-#  gatk-vqsr:
-#    jvm_opts: ["-Xms1000m", "-Xmx2500m"]
+  gatk-vqsr:
+    jvm_opts: ["-Xms1000m", "-Xmx2500m"]
   picard:
     cores: 8
     dir: $PICARD_HOME
