@@ -53,30 +53,34 @@ def pipeline_summary(data):
 
 def check_run_quality(data):
     """ Run fastqc only on raw fastq files """
-    print "I am here and I am pretty satisfied"
+    logger.info("Entered bcbio.pipeline.qcsummary:check_run_quality()")
+    logger.info("Data is {}".format(data))
+    #print "I am here and I am pretty satisfied"
     if "summary" not in data:
         data["summary"]= {}
-    import pdb; pdb.set_trace()
 
     fastq1, fastq2 = data["files"]
     config = data["config"]
-    
+
     dirs = data["dirs"]
     qc_dir = utils.safe_makedir(os.path.join(dirs["work"], "qc"))
-    
+
     with utils.curdir_tmpdir() as tmp_dir:
+        logger.info("Running fastqc to generate stats in {}".format(qc_dir))
         fastqc_graphs, fastqc_stats, fastqc_overrep = \
             fastqc_report_fastqOnly(fastq1, fastq2, qc_dir, config)
 
+#    with utils.chdir(qc_dir):
+#        return {"pdf": _generate_pdf(graphs, summary, overrep, bam_file, sample_name,
+#                                     qc_dir, config),
+#                "metrics": summary}
 
-    with utils.chdir(qc_dir):
-        return {"pdf": _generate_pdf(graphs, summary, overrep, bam_file, sample_name,
-                                     qc_dir, config),
-                "metrics": summary}
-
-
-
-    summary_csv = write_project_summary(sum_samples)
+# This part must be called from the main QCPipeline.run() method, as you can't pass
+# the run_parallel() function into a call on itself
+#    logger.info("Writing project summary...")
+#    sum_samples = run_parallel("pipeline_summary", samples)
+#    summary_csv = write_project_summary(sum_samples)
+#    logger.info("Wrote project summary to \'{}\'".format(summary_csv))
 
     return [[data]]
 

@@ -50,6 +50,7 @@ def run_main(config, config_file, work_dir, parallel,
         for pipeline, pipeline_items in pipelines.items():
             pipeline_items = _add_provenance(pipeline_items, dirs, run_parallel, parallel, config)
             versioncheck.testall(pipeline_items)
+            # Here is where the pipeline is actually executed
             for xs in pipeline.run(config, config_file, run_parallel, parallel, dirs, pipeline_items):
                 if len(xs) == 1:
                     upload.from_sample(xs[0])
@@ -218,11 +219,11 @@ class QCpipeline(AbstractPipeline):
 
     @classmethod
     def run(self, config, config_file, run_parallel, parallel, dirs, lane_items):
-        print "This is a pretty complex pipeline!!!"
+        logger.info("This is a pretty complex pipeline!!!")
         samples = run_parallel("quality_check", lane_items)
         #samples = run_parallel("check_run_quality", lane_items) ## under development
         #here it fails
-        print "checked quality!!!"
+        logger.info("checked quality!!!")
         return samples
 
         #samples = run_parallel("process_alignment", lane_items)
