@@ -220,7 +220,9 @@ class QCpipeline(AbstractPipeline):
     @classmethod
     def run(self, config, config_file, run_parallel, parallel, dirs, lane_items):
         logger.info("This is a pretty complex pipeline!!!")
+        import pdb; pdb.set_trace()
         samples = run_parallel("quality_check", lane_items)
+        #samples = run_parallel("contaminant_screen", lane_items)
         #samples = run_parallel("check_run_quality", lane_items) ## under development
         #here it fails
         logger.info("checked quality!!!")
