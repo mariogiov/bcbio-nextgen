@@ -53,46 +53,53 @@ def pipeline_summary(data):
     return [[data]]
 
 def contaminant_screen(data):
+    """Runs fastq_screen on fastq files using default configuration.
+    TODO:
+        - move files to 'final' (output directory specified in config)
+        - delete tmp files
+        - return the location of output directory from do.run()
+        - implement checks for other config files
+        - other fastq_screen options?
+            - --subset take a subset of reads
+            - --bowtie extra bowtie args?
+    """
     logger.info("Entered bcbio.pipeline.qcsummary.contaminant_screen()")
-    #from pprint import pprint
-    #print "args are:"
-    #pprint(args)
-    #import pdb; pdb.set_trace()
 
     config = data['config']
-
     dirs = data["dirs"]
-    fastq_files = [data["files"]]
-
+    fastq1, fastq2 = data["files"]
+    fastq_files = [ file for file in fastq1, fastq2 if file is not None ]
     qc_dir = utils.safe_makedir(os.path.join(dirs["work"], "qc"))
     output_dir = utils.safe_makedir(os.path.join(dirs["work"], "qc", "fastq_screen"))
 
     cl = [config_utils.get_program('fastq_screen', config)]
     cl += ["--outdir", output_dir]
-    # TODO some of this section could use ngsalign.bowtie._bowtie_args_from_config except it returns a string, not values
     qual_format = config["algorithm"].get("quality_format")
     if qual_format is None or qual_format.lower() == "illumina":
         cl += ["--illumina"]
-    num_cores = config["algorithm"].get("num_cores", 1)
+    num_cores = config.get("resources", {}).get("bowtie2", {}).get("cores", 1)
     if num_cores is not 1:
         cl += ["--threads", num_cores]
     if len(fastq_files) > 1:
         cl += ["--paired"]
-    cl += [fastq_files]
+    cl += fastq_files
+    cl = [ str(x) for x in cl ]
     do.run(cl,"fastq_screen run command: {}".format(" ".join(cl)))
     return [[]]
 
 def check_run_quality(data):
-    """ Run fastqc only on raw fastq files """
+    """ Run fastqc on fastq files
+    TODO:
+        - fix so this will work with only one (unpaired) read
+        - move files to 'final' (output directory specified in config)
+        - delete tmp files (maybe already done?)
+    """
     logger.info("Entered bcbio.pipeline.qcsummary.check_run_quality()")
-    #logger.info("Data is {}".format(data))
-    #print "I am here and I am pretty satisfied"
+
     if "summary" not in data:
         data["summary"]= {}
-
     fastq1, fastq2 = data["files"]
     config = data["config"]
-
     dirs = data["dirs"]
     qc_dir = utils.safe_makedir(os.path.join(dirs["work"], "qc"))
 
@@ -377,7 +384,7 @@ def _run_fastqc_fastqOnly(fastq1, fastq2, qc_dir, config):
     out_base = utils.safe_makedir(os.path.join(qc_dir, "fastqc"))
     fastqc_out = os.path.join(out_base, "%s_fastqc" %
                               os.path.splitext(os.path.basename(fastq1))[0])
-    """TODO output for second fastq file must be inserted"""
+    # TODO output for second fastq file must be inserted
     if not os.path.exists(fastqc_out):
         cl = [config_utils.get_program("fastqc", config), "-o", out_base, "-f", "fastq", fastq1, fastq2]
         subprocess.check_call(cl)

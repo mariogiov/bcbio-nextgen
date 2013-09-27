@@ -38,7 +38,6 @@ def run_main(config, config_file, work_dir, parallel,
     config_file = os.path.join(config_dir, os.path.basename(config_file))
     dirs = {"fastq": fastq_dir, "galaxy": galaxy_dir,
             "work": work_dir, "flowcell": fc_dir, "config": config_dir}
-    import pdb; pdb.set_trace()
     run_items = run_info.organize(dirs, config, run_info_yaml)
     run_parallel = parallel_runner(parallel, dirs, config, config_file)
 
@@ -51,7 +50,6 @@ def run_main(config, config_file, work_dir, parallel,
         for pipeline, pipeline_items in pipelines.items():
             pipeline_items = _add_provenance(pipeline_items, dirs, run_parallel, parallel, config)
             versioncheck.testall(pipeline_items)
-            # Here is where the pipeline is actually executed
             for xs in pipeline.run(config, config_file, run_parallel, parallel, dirs, pipeline_items):
                 if len(xs) == 1:
                     upload.from_sample(xs[0])
@@ -220,6 +218,7 @@ class QCPipeline(AbstractPipeline):
 
     @classmethod
     def run(self, config, config_file, run_parallel, parallel, dirs, lane_items):
+        # TODO how does this work w.r.t. lane_items, etc. ?
         logger.info("This is a pretty complex pipeline!!!")
         samples = run_parallel("quality_check", lane_items)
         samples = run_parallel("contaminant_screen", lane_items)
