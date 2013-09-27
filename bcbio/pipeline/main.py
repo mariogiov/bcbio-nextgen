@@ -38,6 +38,7 @@ def run_main(config, config_file, work_dir, parallel,
     config_file = os.path.join(config_dir, os.path.basename(config_file))
     dirs = {"fastq": fastq_dir, "galaxy": galaxy_dir,
             "work": work_dir, "flowcell": fc_dir, "config": config_dir}
+    import pdb; pdb.set_trace()
     run_items = run_info.organize(dirs, config, run_info_yaml)
     run_parallel = parallel_runner(parallel, dirs, config, config_file)
 
@@ -214,15 +215,14 @@ class AbstractPipeline:
         return
 
 
-class QCpipeline(AbstractPipeline):
-    name = "QCpipeline"
+class QCPipeline(AbstractPipeline):
+    name = "qcpipeline"
 
     @classmethod
     def run(self, config, config_file, run_parallel, parallel, dirs, lane_items):
         logger.info("This is a pretty complex pipeline!!!")
-        import pdb; pdb.set_trace()
         samples = run_parallel("quality_check", lane_items)
-        #samples = run_parallel("contaminant_screen", lane_items)
+        samples = run_parallel("contaminant_screen", lane_items)
         #samples = run_parallel("check_run_quality", lane_items) ## under development
         #here it fails
         logger.info("checked quality!!!")

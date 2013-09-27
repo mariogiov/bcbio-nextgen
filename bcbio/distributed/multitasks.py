@@ -11,6 +11,10 @@ def process_lane(*args):
     return lane.process_lane(*args)
 
 @utils.map_wrap
+def contaminant_screen(*args):
+    return qcsummary.contaminant_screen(*args)
+
+@utils.map_wrap
 def quality_check(*args):
     return qcsummary.check_run_quality(*args)
 

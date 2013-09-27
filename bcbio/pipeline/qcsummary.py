@@ -16,7 +16,9 @@ from bcbio import utils
 from bcbio.broad import runner_from_config
 from bcbio.broad.metrics import PicardMetrics, PicardMetricsParser, RNASeqPicardMetrics
 from bcbio.log import logger
+from bcbio.ngsalign.bowtie import _bowtie_args_from_config
 from bcbio.pipeline import config_utils
+from bcbio.provenance import do
 
 # ## High level functions to generate summary PDF
 
@@ -50,11 +52,40 @@ def pipeline_summary(data):
         data["summary"] = generate_align_summary(work_bam, data)
     return [[data]]
 
+def contaminant_screen(data):
+    logger.info("Entered bcbio.pipeline.qcsummary.contaminant_screen()")
+    #from pprint import pprint
+    #print "args are:"
+    #pprint(args)
+    #import pdb; pdb.set_trace()
+
+    config = data['config']
+
+    dirs = data["dirs"]
+    fastq_files = [data["files"]]
+
+    qc_dir = utils.safe_makedir(os.path.join(dirs["work"], "qc"))
+    output_dir = utils.safe_makedir(os.path.join(dirs["work"], "qc", "fastq_screen"))
+
+    cl = [config_utils.get_program('fastq_screen', config)]
+    cl += ["--outdir", output_dir]
+    # TODO some of this section could use ngsalign.bowtie._bowtie_args_from_config except it returns a string, not values
+    qual_format = config["algorithm"].get("quality_format")
+    if qual_format is None or qual_format.lower() == "illumina":
+        cl += ["--illumina"]
+    num_cores = config["algorithm"].get("num_cores", 1)
+    if num_cores is not 1:
+        cl += ["--threads", num_cores]
+    if len(fastq_files) > 1:
+        cl += ["--paired"]
+    cl += [fastq_files]
+    do.run(cl,"fastq_screen run command: {}".format(" ".join(cl)))
+    return [[]]
 
 def check_run_quality(data):
     """ Run fastqc only on raw fastq files """
-    logger.info("Entered bcbio.pipeline.qcsummary:check_run_quality()")
-    logger.info("Data is {}".format(data))
+    logger.info("Entered bcbio.pipeline.qcsummary.check_run_quality()")
+    #logger.info("Data is {}".format(data))
     #print "I am here and I am pretty satisfied"
     if "summary" not in data:
         data["summary"]= {}
@@ -83,7 +114,6 @@ def check_run_quality(data):
 #    logger.info("Wrote project summary to \'{}\'".format(summary_csv))
 
     return [[data]]
-
 
 def generate_align_summary(bam_file, data):
     if data["analysis"].lower() == "rna-seq":
