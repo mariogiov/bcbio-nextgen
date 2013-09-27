@@ -1,4 +1,4 @@
-galaxy_config: universe_wsgi.ini
+galaxy_config: $HOME/scilife_bcbb/tests/data/automated/universe_wsgi.ini
 algorithm:
   aligner: bowtie
   max_errors: 2
