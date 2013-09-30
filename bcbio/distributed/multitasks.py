@@ -13,6 +13,7 @@ def process_lane(*args):
 @utils.map_wrap
 def contaminant_screen(*args):
     return qcsummary.contaminant_screen(*args)
+contaminant_screen.metadata = {"resources": ["fastq_screen", "bowtie2", "bowtie"]}
 
 @utils.map_wrap
 def quality_check(*args):
