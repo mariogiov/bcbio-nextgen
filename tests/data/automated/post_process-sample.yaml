@@ -15,8 +15,6 @@ resources:
     memory: 36g
   bowtie:
     cores: 8
-  bowtie2:
-    cores: 8
   tophat:
     cores: 8
   bwa:
