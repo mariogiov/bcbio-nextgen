@@ -15,6 +15,8 @@ resources:
     memory: 36g
   bowtie:
     cores: 8
+  bowtie2:
+    cores: 8
   tophat:
     cores: 8
   bwa:
@@ -58,7 +60,7 @@ resources:
 algorithm:
   aligner: bowtie2
   max_errors: 2
-  num_cores: 2
+  num_cores: 8
   platform: illumina
   recalibrate: false
   save_diskspace: true
