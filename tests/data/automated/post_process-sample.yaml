@@ -1,4 +1,5 @@
-galaxy_config: $HOME/scilife_bcbb/tests/data/automated/universe_wsgi.ini
+galaxy_config: $GALAXY_CONFIG
+#galaxy_config: $HOME/scilife_bcbb/tests/data/automated/universe_wsgi.ini
 
 # Define resources to be used for individual programs on multicore machines.
 # These can be defined specifically for memory and processor availability.
