@@ -8,6 +8,7 @@ from bcbio.log import logger
 from bcbio.upload import shared
 
 def copy_finfo(finfo, storage_dir):
+    # TODO: do we need this "ext" bit? consider adding only if ext exists
     if finfo.has_key("sample"):
         out_file = os.path.join(storage_dir, "%s-%s.%s" % (finfo["sample"], finfo["ext"],
                                                            finfo["type"]))

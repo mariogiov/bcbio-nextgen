@@ -4,6 +4,7 @@ import datetime
 
 from bcbio.upload import shared, filesystem, galaxy, s3
 from bcbio.utils import file_exists
+from bcbio.log import logger
 
 _approaches = {"filesystem": filesystem,
                "galaxy": galaxy,
@@ -33,8 +34,55 @@ def _get_files(sample):
         return _get_files_variantcall(sample)
     elif analysis in ["RNA-seq"]:
         return _get_files_rnaseq(sample)
+    elif analysis in ["QCPipeline"]:
+        return _get_files_qconly(sample)
     else:
         return []
+
+## MARIO QC PIPELINE ADDITIONS
+## START
+def _get_files_qconly(sample):
+    out = []
+    algorithm = sample["config"]["algorithm"]
+    out = _maybe_add_fastqc(algorithm, sample, out)
+    out = _maybe_add_fastqscreen(algorithm, sample, out)
+    #out = _maybe_add_facs(algorithm, sample, out)
+    #out = _maybe_add_alignment(algorithm, sample, out)
+    return _add_meta(out, sample)
+
+
+def _maybe_add_fastqc(algorithm, sample, out):
+    # This conditional should be applied in the QCPipeline class too
+    # I think
+    if "fastqc" in algorithm.get("qc_steps") and sample.get("fastqc"):
+    #if algorithm.get("fastqc") and sample.get("fastqc_files"):
+        logger.info("FASTQC UPLOAD TRUE")
+    # I THINK that the later algorithms
+    # will iterate through everything in out,
+    # in which case this should work, so long as I set it up
+    # properly in the fastqc algorithm
+    # FastQC produces one dir for each read, or really each
+    # sample processed, so this is probably the best way to do it.
+        for fastqc_zip in sample["fastqc"]:
+            out.append({"path": fastqc_zip['path'],
+                        "type": "zip",
+                        "ext": fastqc_zip["number"] + "_qc-fastqc",})
+    return out
+
+def _maybe_add_fastqscreen(algorithm, sample, out):
+    if "fastqscreen" in algorithm.get("qc_steps") and sample.get("fastqscreen"):
+    #if algorithm.get("fastqscreen"):
+        logger.info("FASTQSCREEN UPLOAD TRUE")
+        #for fastqscreen_dir in sample["fastqscreen"]:
+        out.append({"path": sample["fastqscreen"]["png_file"],
+                    "type": "png",
+                    "ext": "qc-fastqscreen",})
+        out.append({"path": sample["fastqscreen"]["txt_file"],
+                    "type": "txt",
+                    "ext": "qc-fastqscreen",})
+    return out
+
+## END
 
 def _get_files_rnaseq(sample):
     out = []

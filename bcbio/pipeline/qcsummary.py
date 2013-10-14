@@ -63,29 +63,42 @@ def contaminant_screen(data):
             - --subset take a subset of reads
             - --bowtie extra bowtie args?
     """
-    logger.info("Entered bcbio.pipeline.qcsummary.contaminant_screen()")
+    #logger.info("Entered bcbio.pipeline.qcsummary.contaminant_screen()")
 
-    config = data['config']
+    config = data["config"]
     dirs = data["dirs"]
-    fastq1, fastq2 = data["files"]
-    fastq_files = [ file for file in fastq1, fastq2 if file is not None ]
-    qc_dir = utils.safe_makedir(os.path.join(dirs["work"], "qc"))
-    output_dir = utils.safe_makedir(os.path.join(dirs["work"], "qc", "fastq_screen"))
 
-    cl = [config_utils.get_program('fastq_screen', config)]
-    cl += ["--outdir", output_dir]
-    qual_format = config["algorithm"].get("quality_format")
-    if qual_format is None or qual_format.lower() == "illumina":
-        cl += ["--illumina"]
-    num_cores = config.get("resources", {}).get("bowtie2", {}).get("cores", 1)
-    if num_cores is not 1:
-        cl += ["--threads", num_cores]
-    if len(fastq_files) > 1:
-        cl += ["--paired"]
-    cl += fastq_files
-    cl = [ str(x) for x in cl ]
-    do.run(cl,"fastq_screen run command: {}".format(" ".join(cl)))
-    return [[]]
+    fastq1, fastq2 = data["files"]
+    # Handle one or two fastq files
+    fastq_files = [ file for file in fastq1, fastq2 if file is not None ]
+
+    png_file, txt_file = None, None
+
+    # TODO: do we need remove=False?
+    with utils.curdir_tmpdir(remove=False) as qc_dir:
+        cl = [config_utils.get_program("fastq_screen", config)]
+        cl += ["--outdir", qc_dir]
+        qual_format = config["algorithm"].get("quality_format")
+        if qual_format is None or qual_format.lower() == "illumina":
+            cl += ["--illumina"]
+        num_cores = config["algorithm"].get("num_cores", 1)
+        if num_cores is not 1:
+            cl += ["--threads", num_cores]
+        # TODO: add --subset functionality
+        #       decide: where to add into config?
+        if len(fastq_files) > 1:
+            cl += ["--paired"]
+        cl += fastq_files
+        cl = [ str(x) for x in cl ]
+        do.run(cl,"fastq_screen run command: {}".format(" ".join(cl)))
+
+        png_file = glob.glob(os.path.join(qc_dir, "*.png"))[0]
+        txt_file = glob.glob(os.path.join(qc_dir, "*.txt"))[0]
+
+    # Add the output files to the giant dictionary
+    data["fastqscreen"] = { 'png_file': png_file,
+                            'txt_file': txt_file }
+    return [[data]]
 
 def check_run_quality(data):
     """ Run fastqc on fastq files
@@ -101,12 +114,23 @@ def check_run_quality(data):
     fastq1, fastq2 = data["files"]
     config = data["config"]
     dirs = data["dirs"]
-    qc_dir = utils.safe_makedir(os.path.join(dirs["work"], "qc"))
 
-    with utils.curdir_tmpdir() as tmp_dir:
+    zip_files = []
+    # may
+    with utils.curdir_tmpdir(remove=False) as qc_dir:
         logger.info("Running fastqc to generate stats in {}".format(qc_dir))
+        # TODO: change the way this runs in Francesco's function below to use the tmpdir's builtin functions
+        #       instead of manually creating and removing diretories/files
+        # at the moment this is broken as it deletes the files before I can get at them
         fastqc_graphs, fastqc_stats, fastqc_overrep = \
             fastqc_report_fastqOnly(fastq1, fastq2, qc_dir, config)
+
+        # TODO: what happens downstream if this is empty? it should be fine, but check
+        zip_files = glob.glob(os.path.join(qc_dir, "fastqc", "*.zip"))
+
+    # TODO: this number thing is a hack. fix it when you implement better support for single/multiple fastqc files
+    data["fastqc"] = [ {'path': zip_file, 'number': str(number) } for number, zip_file in enumerate(zip_files) if zip_files ]
+
 
 #    with utils.chdir(qc_dir):
 #        return {"pdf": _generate_pdf(graphs, summary, overrep, bam_file, sample_name,
@@ -381,6 +405,8 @@ def _run_fastqc(bam_file, qc_dir, config):
     return fastqc_out
 
 def _run_fastqc_fastqOnly(fastq1, fastq2, qc_dir, config):
+    # TODO: it is unnecessary to make more directories beyond the tmpdir created using the context manager
+    # utils.curdir_tmpdir()
     out_base = utils.safe_makedir(os.path.join(qc_dir, "fastqc"))
     fastqc_out = os.path.join(out_base, "%s_fastqc" %
                               os.path.splitext(os.path.basename(fastq1))[0])

@@ -221,9 +221,7 @@ class QCPipeline(AbstractPipeline):
         # TODO how does this work w.r.t. lane_items, etc. ?
         logger.info("This is a pretty complex pipeline!!!")
         samples = run_parallel("quality_check", lane_items)
-        samples = run_parallel("contaminant_screen", lane_items)
-        #samples = run_parallel("check_run_quality", lane_items) ## under development
-        #here it fails
+        samples = run_parallel("contaminant_screen", samples)
         logger.info("checked quality!!!")
         return samples
 
