@@ -5,6 +5,7 @@ import copy
 import csv
 import glob
 import os
+import re
 import subprocess
 import xml.etree.ElementTree as ET
 
@@ -55,16 +56,12 @@ def pipeline_summary(data):
 def contaminant_screen(data):
     """Runs fastq_screen on fastq files using default configuration.
     TODO:
-        - move files to 'final' (output directory specified in config)
         - delete tmp files
         - return the location of output directory from do.run()
         - implement checks for other config files
         - other fastq_screen options?
-            - --subset take a subset of reads
             - --bowtie extra bowtie args?
     """
-    #logger.info("Entered bcbio.pipeline.qcsummary.contaminant_screen()")
-
     config = data["config"]
     dirs = data["dirs"]
 
@@ -78,26 +75,28 @@ def contaminant_screen(data):
     with utils.curdir_tmpdir(remove=False) as qc_dir:
         cl = [config_utils.get_program("fastq_screen", config)]
         cl += ["--outdir", qc_dir]
+        cl += ["--subset", "2000000"]
         qual_format = config["algorithm"].get("quality_format")
         if qual_format is None or qual_format.lower() == "illumina":
             cl += ["--illumina"]
         num_cores = config["algorithm"].get("num_cores", 1)
         if num_cores is not 1:
             cl += ["--threads", num_cores]
-        # TODO: add --subset functionality
-        #       decide: where to add into config?
         if len(fastq_files) > 1:
             cl += ["--paired"]
         cl += fastq_files
         cl = [ str(x) for x in cl ]
         do.run(cl,"fastq_screen run command: {}".format(" ".join(cl)))
 
-        png_file = glob.glob(os.path.join(qc_dir, "*.png"))[0]
-        txt_file = glob.glob(os.path.join(qc_dir, "*.txt"))[0]
+        import pdb; pdb.set_trace()
+        file = os.path.basename(fastq1)
+        file_run_part = re.match(r'(?P<file_run_part>.*)_fastq.txt', file).group('file_run_part')
+        png_file = os.path.join(qc_dir, "{}_fastq_screen.png".format(file_run_part))
+        txt_file = os.path.join(qc_dir, "{}_fastq_screen.txt".format(file_run_part))
 
-    # Add the output files to the giant dictionary
-    data["fastqscreen"] = { 'png_file': png_file,
-                            'txt_file': txt_file }
+        # Add the output files to the giant dictionary
+        data["fastqscreen"] = { 'png_file': png_file,
+                                'txt_file': txt_file }
     return [[data]]
 
 def check_run_quality(data):
@@ -107,21 +106,20 @@ def check_run_quality(data):
         - move files to 'final' (output directory specified in config)
         - delete tmp files (maybe already done?)
     """
-    logger.info("Entered bcbio.pipeline.qcsummary.check_run_quality()")
-
-    if "summary" not in data:
-        data["summary"]= {}
-    fastq1, fastq2 = data["files"]
     config = data["config"]
     dirs = data["dirs"]
+    if "summary" not in data:
+        data["summary"] = {}
+
+    fastq1, fastq2 = data["files"]
+    # Handle one or two fastq files
+    fastq_files = [ file for file in fastq1, fastq2 if file is not None ]
 
     zip_files = []
-    # may
     with utils.curdir_tmpdir(remove=False) as qc_dir:
         logger.info("Running fastqc to generate stats in {}".format(qc_dir))
         # TODO: change the way this runs in Francesco's function below to use the tmpdir's builtin functions
         #       instead of manually creating and removing diretories/files
-        # at the moment this is broken as it deletes the files before I can get at them
         fastqc_graphs, fastqc_stats, fastqc_overrep = \
             fastqc_report_fastqOnly(fastq1, fastq2, qc_dir, config)
 
