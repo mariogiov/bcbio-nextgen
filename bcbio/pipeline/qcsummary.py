@@ -56,23 +56,29 @@ def pipeline_summary(data):
 def contaminant_screen(data):
     """Runs fastq_screen on fastq files using default configuration.
     TODO:
-        - delete tmp files
-        - return the location of output directory from do.run()
-        - implement checks for other config files
-        - other fastq_screen options?
-            - --bowtie extra bowtie args?
+        - don't re-run analysis if the output files already exist
+            - this is done by constructing the output file name first and os.path.exists()ing it
     """
     config = data["config"]
     dirs = data["dirs"]
+    # this is to prevent a KeyError in upload.__init__
+    if "summary" not in data:
+        data["summary"] = {}
+
 
     fastq1, fastq2 = data["files"]
     # Handle one or two fastq files
     fastq_files = [ file for file in fastq1, fastq2 if file is not None ]
+    qc_dir = utils.safe_makedir(os.path.join(dirs["work"], "qc", "fastq_screen"))
 
-    png_file, txt_file = None, None
+    # Check to see if the output files already exist
+    base_filename = os.path.basename(fastq1)
+    file_run_part = _get_fastq_outname(base_filename)
+    #file_run_part = re.match(r'(?P<file_run_part>.*)_fastq.txt', file).group('file_run_part')
+    png_file = os.path.join(qc_dir, "{}_fastq_screen.png".format(file_run_part))
+    txt_file = os.path.join(qc_dir, "{}_fastq_screen.txt".format(file_run_part))
 
-    # TODO: do we need remove=False?
-    with utils.curdir_tmpdir(remove=False) as qc_dir:
+    if not os.path.exists(png_file) and not os.path.exists(txt_file):
         cl = [config_utils.get_program("fastq_screen", config)]
         cl += ["--outdir", qc_dir]
         cl += ["--subset", "2000000"]
@@ -88,59 +94,32 @@ def contaminant_screen(data):
         cl = [ str(x) for x in cl ]
         do.run(cl,"fastq_screen run command: {}".format(" ".join(cl)))
 
-        import pdb; pdb.set_trace()
-        file = os.path.basename(fastq1)
-        file_run_part = re.match(r'(?P<file_run_part>.*)_fastq.txt', file).group('file_run_part')
-        png_file = os.path.join(qc_dir, "{}_fastq_screen.png".format(file_run_part))
-        txt_file = os.path.join(qc_dir, "{}_fastq_screen.txt".format(file_run_part))
-
-        # Add the output files to the giant dictionary
-        data["fastqscreen"] = { 'png_file': png_file,
-                                'txt_file': txt_file }
+    # Add the output files to the giant dictionary
+    data["fastqscreen"] = { 'png_file': png_file,
+                            'txt_file': txt_file }
     return [[data]]
 
 def check_run_quality(data):
     """ Run fastqc on fastq files
-    TODO:
-        - fix so this will work with only one (unpaired) read
-        - move files to 'final' (output directory specified in config)
-        - delete tmp files (maybe already done?)
     """
+
     config = data["config"]
     dirs = data["dirs"]
+    # this is to prevent a KeyError in upload.__init__
     if "summary" not in data:
         data["summary"] = {}
 
     fastq1, fastq2 = data["files"]
-    # Handle one or two fastq files
     fastq_files = [ file for file in fastq1, fastq2 if file is not None ]
 
-    zip_files = []
-    with utils.curdir_tmpdir(remove=False) as qc_dir:
-        logger.info("Running fastqc to generate stats in {}".format(qc_dir))
-        # TODO: change the way this runs in Francesco's function below to use the tmpdir's builtin functions
-        #       instead of manually creating and removing diretories/files
-        fastqc_graphs, fastqc_stats, fastqc_overrep = \
-            fastqc_report_fastqOnly(fastq1, fastq2, qc_dir, config)
-
-        # TODO: what happens downstream if this is empty? it should be fine, but check
-        zip_files = glob.glob(os.path.join(qc_dir, "fastqc", "*.zip"))
-
-    # TODO: this number thing is a hack. fix it when you implement better support for single/multiple fastqc files
-    data["fastqc"] = [ {'path': zip_file, 'number': str(number) } for number, zip_file in enumerate(zip_files) if zip_files ]
-
-
-#    with utils.chdir(qc_dir):
-#        return {"pdf": _generate_pdf(graphs, summary, overrep, bam_file, sample_name,
-#                                     qc_dir, config),
-#                "metrics": summary}
-
-# This part must be called from the main QCPipeline.run() method, as you can't pass
-# the run_parallel() function into a call on itself
-#    logger.info("Writing project summary...")
-#    sum_samples = run_parallel("pipeline_summary", samples)
-#    summary_csv = write_project_summary(sum_samples)
-#    logger.info("Wrote project summary to \'{}\'".format(summary_csv))
+    qc_dir = os.path.join(dirs["work"], "qc")
+    logger.info("Running fastqc to generate stats in {}".format(qc_dir))
+    data["fastqc"] = []
+    for fastq_file in fastq_files:
+        fastqc_out = _run_fastqc(fastq_file, qc_dir, config, delete_zip=False)
+        # TODO maybe better to upload unzipped folder?
+        fastqc_zip = "{}.zip".format(fastqc_out)
+        data["fastqc"].append({'path': fastqc_zip})
 
     return [[data]]
 
@@ -316,19 +295,10 @@ def is_paired(bam_file):
 
 # ## Run and parse read information from FastQC
 
-def fastqc_report_fastqOnly(fastq1, fastq2, qc_dir, config):
-    """Calculate statistics about paired fastq files using FastQC.
-    """
-    out_dir = _run_fastqc_fastqOnly(fastq1, fastq2, qc_dir, config)
-    parser = FastQCParser(out_dir)
-    graphs = parser.get_fastqc_graphs()
-    stats, overrep = parser.get_fastqc_summary()
-    return graphs, stats, overrep
-
-def fastqc_report(bam_file, qc_dir, config):
+def fastqc_report(seq_file, qc_dir, config):
     """Calculate statistics about a read using FastQC.
     """
-    out_dir = _run_fastqc(bam_file, qc_dir, config)
+    out_dir = _run_fastqc(seq_file, qc_dir, config)
     parser = FastQCParser(out_dir)
     graphs = parser.get_fastqc_graphs()
     stats, overrep = parser.get_fastqc_summary()
@@ -390,33 +360,34 @@ class FastQCParser:
                         out.append(line.rstrip("\r\n"))
         return out
 
-def _run_fastqc(bam_file, qc_dir, config):
+def _run_fastqc(seq_file, qc_dir, config, delete_zip=True):
+    #valid_input_formats = ('bam', 'sam', 'bam_mapped', 'sam_mapped', 'fastq')
     out_base = utils.safe_makedir(os.path.join(qc_dir, "fastqc"))
-    fastqc_out = os.path.join(out_base, "%s_fastqc" %
-                              os.path.splitext(os.path.basename(bam_file))[0])
+    # TODO: ensure this works properly with bam files / ensure you didn't break the std. pipeline
+    fastqc_out = os.path.join(out_base, "{}_fastqc".format(_get_fastq_outname(seq_file)))
+    #fastqc_out = os.path.join(out_base, "{}_fastqc".format(
+    #                          os.path.splitext(os.path.basename(seq_file))[0]))
     if not os.path.exists(fastqc_out):
         cl = [config_utils.get_program("fastqc", config),
-              "-o", out_base, "-f", "bam", bam_file]
+              "-o", out_base, seq_file]
+        #_, type = os.path.splitext(seq_file)
+        #if type[1:] in valid_input_formats:
+        #    cl += ["-f", type[1:], seq_file]
+        #else:
+        #    logger.warn("WARNING: FastQC input file type \"{}\" invalid; assuming type fastq.".format(type))
+        #    cl += ["-f", "fastq", seq_file]
         subprocess.check_call(cl)
-    if os.path.exists("%s.zip" % fastqc_out):
-        os.remove("%s.zip" % fastqc_out)
+    if delete_zip and os.path.exists("{}.zip".format(fastqc_out)):
+        os.remove("{}.zip".format(fastqc_out))
     return fastqc_out
 
-def _run_fastqc_fastqOnly(fastq1, fastq2, qc_dir, config):
-    # TODO: it is unnecessary to make more directories beyond the tmpdir created using the context manager
-    # utils.curdir_tmpdir()
-    out_base = utils.safe_makedir(os.path.join(qc_dir, "fastqc"))
-    fastqc_out = os.path.join(out_base, "%s_fastqc" %
-                              os.path.splitext(os.path.basename(fastq1))[0])
-    # TODO output for second fastq file must be inserted
-    if not os.path.exists(fastqc_out):
-        cl = [config_utils.get_program("fastqc", config), "-o", out_base, "-f", "fastq", fastq1, fastq2]
-        subprocess.check_call(cl)
-    if os.path.exists("%s.zip" % fastqc_out):
-        os.remove("%s.zip" % fastqc_out)
-    return fastqc_out
-
-
+def _get_fastq_outname(seq_file):
+    """Input files named '<name>_fastq.txt' and '<name>.fastq' both produce output directory '<name>_fastqc/';
+       this function figures out what the output base will be.
+    """
+    base, ext = os.path.splitext(os.path.basename(seq_file))
+    base = re.sub(r'_fastq', '', base)
+    return base
 
 # ## High level summary in YAML format for loading into Galaxy.
 

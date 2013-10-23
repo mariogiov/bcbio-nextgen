@@ -214,7 +214,7 @@ class AbstractPipeline:
 
 
 class QCPipeline(AbstractPipeline):
-    name = "qcpipeline"
+    name = "qcpipeline_noalign"
 
     @classmethod
     def run(self, config, config_file, run_parallel, parallel, dirs, lane_items):
@@ -222,26 +222,7 @@ class QCPipeline(AbstractPipeline):
         logger.info("This is a pretty complex pipeline!!!")
         samples = run_parallel("quality_check", lane_items)
         samples = run_parallel("contaminant_screen", samples)
-        logger.info("checked quality!!!")
         return samples
-
-        #samples = run_parallel("process_alignment", lane_items)
-        ## process samples, potentially multiplexed across multiple lanes
-        #samples = organize_samples(align_items, dirs, config_file)
-        #samples = run_parallel("merge_sample", samples)
-        #samples = run_parallel("prep_recal", samples)
-        #samples = recalibrate.parallel_write_recal_bam(samples, run_parallel)
-        #samples = parallel_realign_sample(samples, run_parallel)
-        #samples = parallel_variantcall(samples, run_parallel)
-        #samples = run_parallel("postprocess_variants", samples)
-        #samples = combine_multiple_callers(samples)
-        #samples = ensemble.combine_calls_parallel(samples, run_parallel)
-        #samples = run_parallel("detect_sv", samples)
-        #samples = qcsummary.generate_parallel(samples, run_parallel)
-        #run_parallel("generate_bigwig", samples, {"programs": ["ucsc_bigwig"]})
-        #return samples
-
-
 
 
 class VariantPipeline(AbstractPipeline):
