@@ -56,7 +56,8 @@ def _add_reference_resources(data):
     align_ref, sam_ref = genome.get_refs(data["genome_build"], aligner, data["dirs"]["galaxy"])
     data["align_ref"] = align_ref
     data["sam_ref"] = sam_ref
-    data["genome_resources"] = genome.get_resources(data["genome_build"], sam_ref)
+    ref_loc = data.get('config').get('species_resources') or sam_ref
+    data["genome_resources"] = genome.get_resources(data["genome_build"], ref_loc)
     return data
 
 # ## Sample and BAM read group naming
@@ -142,7 +143,8 @@ def _check_algorithm_keys(item):
                      "phasing", "validate", "validate_regions", "validate_genome_build",
                      "clinical_reporting",
                      "nomap_split_size", "nomap_split_targets",
-                     "ensemble"])
+                     "ensemble",
+                     "qc_steps",])
     problem_keys = [k for k in item["algorithm"].iterkeys() if k not in supported]
     if len(problem_keys) > 0:
         raise ValueError("Unexpected configuration keyword in 'algorithm' section: %s\n"
