@@ -214,12 +214,11 @@ class AbstractPipeline:
 
 
 class QCPipeline(AbstractPipeline):
-    name = "qcpipeline_noalign"
+    name = "qc"
 
     @classmethod
     def run(self, config, config_file, run_parallel, parallel, dirs, lane_items):
         # TODO how does this work w.r.t. lane_items, etc. ?
-        logger.info("This is a pretty complex pipeline!!!")
         samples = run_parallel("quality_check", lane_items)
         samples = run_parallel("contaminant_screen", samples)
         return samples

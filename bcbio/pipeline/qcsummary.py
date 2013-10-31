@@ -78,7 +78,7 @@ def contaminant_screen(data):
     png_file = os.path.join(qc_dir, "{}_fastq_screen.png".format(file_run_part))
     txt_file = os.path.join(qc_dir, "{}_fastq_screen.txt".format(file_run_part))
 
-    if not os.path.exists(png_file) and not os.path.exists(txt_file):
+    if not os.path.exists(png_file) or not os.path.exists(txt_file):
         cl = [config_utils.get_program("fastq_screen", config)]
         cl += ["--outdir", qc_dir]
         cl += ["--subset", "2000000"]
