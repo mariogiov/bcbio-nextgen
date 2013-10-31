@@ -143,8 +143,7 @@ def _check_algorithm_keys(item):
                      "phasing", "validate", "validate_regions", "validate_genome_build",
                      "clinical_reporting",
                      "nomap_split_size", "nomap_split_targets",
-                     "ensemble",
-                     "qc_steps",])
+                     "ensemble"])
     problem_keys = [k for k in item["algorithm"].iterkeys() if k not in supported]
     if len(problem_keys) > 0:
         raise ValueError("Unexpected configuration keyword in 'algorithm' section: %s\n"
