@@ -65,6 +65,10 @@ multiple samples using the template workflow command::
    -  :ref:`sample-configuration` metadata key/value pairs. Any columns not
       falling into the above cases will go into the metadata section.
 
+  Individual column items can contain booleans (true or false), integers, or
+  lists (separated by semi-colons). These get converted into the expected time
+  in the output YAML file.
+
   The name of the metadata file, minus the ``.csv`` extension, is a
   short name identifying the current project. The script creates a
   ``project1`` directory containing the sample configuration in
@@ -125,7 +129,9 @@ The sample configuration file defines ``details`` of each sample to process::
 
     - ``batch`` defines a group that the sample falls in. We perform
        multi-sample variant calling on all samples with the same batch
-       name.
+       name. This can also be a list, allowing specification of a single normal
+       sample to pair with multiple tumor samples in paired cancer variant
+       calling (``batch: [MatchWithTumor1, MatchWithTumor2]``).
 
     - ``sex`` specifies the sample sex used to correctly prepare X/Y
       chromosomes.
@@ -168,7 +174,7 @@ Galaxy parameters:
   assumes you are able to access a shared directory also present on
   the Galaxy machine.
 - ``galaxy_api_key`` User API key to access Galaxy: see the
-  `Galaxy API`_ documentation.
+ `Galaxy API`_ documentation.
 - ``galaxy_library`` Name of the Galaxy Data Library to upload to. You
   can specify this globally for a project in ``upload`` or for
   individual samples in the sample details section.
@@ -202,6 +208,23 @@ S3 parameters:
   with reduced redundancy: cheaper but less reliable [false, true]
 
 .. _algorithm-config:
+
+Globals
+~~~~~~~
+You can define files used multiple times in the ``algorithm`` section of your
+configuration in a top level ``globals`` dictionary. This saves copying and
+pasting across the configuration and makes it easier to manually adjust the
+configuration if inputs change::
+
+  globals:
+    my_custom_locations: /path/to/file.bed
+  details:
+    - description: sample1
+      algorithm:
+        variant_regions: my_custom_locations
+    - description: sample2
+      algorithm:
+        variant_regions: my_custom_locations
 
 Algorithm parameters
 ~~~~~~~~~~~~~~~~~~~~
@@ -299,6 +322,9 @@ Variant calling
 - ``clinical_reporting`` Tune output for clinical reporting.
   Modifies snpEff parameters to use HGVS notational on canonical
   transcripts [false, true].
+- ``background`` Provide a VCF file with variants to use as a background
+  reference during variant calling. For tumor/normal paired calling use this to
+  supply a panel of normal individuals.
 
 Parallelization
 ===============

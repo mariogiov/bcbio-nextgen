@@ -120,18 +120,17 @@ def _update_conda_packages():
     pkgs = ["biopython", "boto", "cython", "ipython", "lxml", "matplotlib",
             "nose", "numpy", "pandas", "patsy", "pycrypto", "pip", "pysam",
             "pyyaml", "pyzmq", "requests", "scipy", "tornado", "statsmodels"]
+    channels = ["-c", "https://conda.binstar.org/faircloth-lab"]
     if os.path.exists(conda_bin):
-        subprocess.check_call([conda_bin, "install", "--yes"] + pkgs)
-        # Remove until can get 13.1.0 working cleanly on CentOS
-        #extra_pkgs = ["zeromq", "pyzmq"]
-        #binstar_user = "minrk"
-        #subprocess.check_call([conda_bin, "install", "--yes",
-        #                       "-c", "http://conda.binstar.org/%s" % binstar_user] + extra_pkgs)
+        subprocess.check_call([conda_bin, "install", "--yes", "numpy"])
+        subprocess.check_call([conda_bin, "install", "--yes"] + channels + pkgs)
 
 def _get_data_dir():
     base_dir = os.path.realpath(os.path.dirname(os.path.dirname(sys.executable)))
     if "anaconda" not in os.path.basename(base_dir) and "virtualenv" not in os.path.basename(base_dir):
-        raise ValueError("Cannot update data for bcbio-nextgen not installed by installer.")
+        raise ValueError("Cannot update data for bcbio-nextgen not installed by installer.\n"
+                         "bcbio-nextgen needs to be installed inside an anaconda environment \n"
+                         "located in the same directory as `galaxy` `genomes` and `gemini_data` directories.")
     return os.path.dirname(base_dir)
 
 def upgrade_bcbio_data(args, remotes):
@@ -151,7 +150,8 @@ def upgrade_bcbio_data(args, remotes):
                               remotes["genome_resources"])
     _upgrade_snpeff_data(s["fabricrc_overrides"]["galaxy_home"], args, remotes)
     if 'data' in args.toolplus:
-        subprocess.check_call(["gemini", "update", "--dataonly"])
+        gemini = os.path.join(os.path.dirname(sys.executable), "gemini")
+        subprocess.check_call([gemini, "update", "--dataonly"])
 
 def _upgrade_genome_resources(galaxy_dir, base_url):
     """Retrieve latest version of genome resource YAML configuration files.
@@ -183,7 +183,8 @@ def _upgrade_snpeff_data(galaxy_dir, args, remotes):
         resource_file = os.path.join(os.path.dirname(ref_file), "%s-resources.yaml" % dbkey)
         with open(resource_file) as in_handle:
             resources = yaml.load(in_handle)
-        snpeff_db, snpeff_base_dir = effects.get_db(ref_file, resources)
+        snpeff_db, snpeff_base_dir = effects.get_db({"resources": resources,
+                                                     "reference": {"fasta": {"base": ref_file}}})
         if snpeff_db:
             snpeff_db_dir = os.path.join(snpeff_base_dir, snpeff_db)
             if not os.path.exists(snpeff_db_dir):
@@ -215,6 +216,8 @@ def _get_biodata(base_file, args):
 
 def upgrade_thirdparty_tools(args, remotes):
     """Install and update third party tools used in the pipeline.
+
+    Creates a manifest directory with installed programs on the system.
     """
     s = {"fabricrc_overrides": {"system_install": args.tooldir,
                                 "local_install": os.path.join(args.tooldir, "local_install"),
@@ -231,6 +234,13 @@ def upgrade_thirdparty_tools(args, remotes):
     sys.path.insert(0, cbl["dir"])
     cbl_deploy = __import__("cloudbio.deploy", fromlist=["deploy"])
     cbl_deploy.deploy(s)
+    cbl_manifest = __import__("cloudbio.manifest", fromlist=["manifest"])
+    manifest_dir = os.path.join(_get_data_dir(), "manifest")
+    print("Creating manifest of installed packages in %s" % manifest_dir)
+    if os.path.exists(manifest_dir):
+        for fname in os.listdir(manifest_dir):
+            os.remove(os.path.join(manifest_dir, fname))
+    cbl_manifest.create(manifest_dir, args.tooldir)
 
 def _install_gemini(tooldir, datadir, args):
     """Install gemini layered on top of bcbio-nextgen, sharing anaconda framework.
@@ -251,7 +261,7 @@ def _install_gemini(tooldir, datadir, args):
         url = "https://raw.github.com/arq5x/gemini/master/gemini/scripts/gemini_install.py"
         script = os.path.basename(url)
         subprocess.check_call(["wget", "-O", script, url])
-        cmd = [sys.executable, script, tooldir, datadir, "--notools", "--nodata", "--sharedpy"]
+        cmd = [sys.executable, "-E", script, tooldir, datadir, "--notools", "--nodata", "--sharedpy"]
         if not args.sudo:
             cmd.append("--nosudo")
         subprocess.check_call(cmd)
@@ -304,10 +314,10 @@ def add_install_defaults(args):
     with open(install_config) as in_handle:
         default_args = yaml.load(in_handle)
     if default_args.get("tooldist") and args.tooldist == "minimal":
-        args.tooldist = default_args["tooldist"]
+        args.tooldist = str(default_args["tooldist"])
     if args.tools and args.tooldir is None:
         if "tooldir" in default_args:
-            args.tooldir = default_args["tooldir"]
+            args.tooldir = str(default_args["tooldir"])
         else:
             raise ValueError("Default tool directory not yet saved in config defaults. "
                              "Specify the '--tooldir=/path/to/tools' to upgrade tools. "
@@ -317,7 +327,7 @@ def add_install_defaults(args):
         for x in default_args.get(attr, []):
             new_val = getattr(args, attr)
             if x not in getattr(args, attr):
-                new_val.append(x)
+                new_val.append(str(x))
             setattr(args, attr, new_val)
     if "sudo" in default_args and not args.sudo is False:
         args.sudo = default_args["sudo"]
@@ -348,7 +358,7 @@ def add_subparser(subparsers):
                         action="append", default=["GRCh37"],
                         choices=["GRCh37", "hg19", "mm10", "mm9", "rn5", "canFam3"])
     parser.add_argument("--aligners", help="Aligner indexes to download",
-                        action="append", default=["bwa"],
+                        action="append", default=["bwa", "bowtie2"],
                         choices=["bowtie", "bowtie2", "bwa", "novoalign", "star", "ucsc"])
     parser.add_argument("--data", help="Upgrade data dependencies",
                         dest="install_data", action="store_true", default=False)

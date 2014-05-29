@@ -12,8 +12,8 @@ import yaml
 from bcbio import utils
 from bcbio.bam import callable
 from bcbio.pipeline import config_utils
-from bcbio.pipeline import genome
 from bcbio.provenance import do
+from bcbio.variation import validateplot
 
 # ## Individual sample comparisons
 
@@ -92,14 +92,12 @@ def _create_validate_config(vrn_file, rm_file, rm_interval_file, rm_genome,
     """Create a bcbio.variation configuration input for validation.
     """
     if rm_genome:
-        rm_genome = genome.get_refs(rm_genome, None, data["dirs"]["galaxy"])[-1]
-        if rm_genome != data["sam_ref"]:
-            eval_genome = data["sam_ref"]
-        else:
-            eval_genome = None
+        rm_genome = utils.get_in(data, ("reference", "alt", rm_genome, "base"))
+    if rm_genome and rm_genome != utils.get_in(data, ("reference", "fasta", "base")):
+        eval_genome = utils.get_in(data, ("reference", "fasta", "base"))
     else:
+        rm_genome = utils.get_in(data, ("reference", "fasta", "base"))
         eval_genome = None
-        rm_genome = data["sam_ref"]
     ref_call = {"file": str(rm_file), "name": "ref", "type": "grading-ref",
                 "preclean": True, "prep": True, "remove-refcalls": True}
     a_intervals = get_analysis_intervals(data)
@@ -129,7 +127,8 @@ def get_analysis_intervals(data):
     if data.get("ensemble_bed"):
         return data["ensemble_bed"]
     elif data.get("callable_bam"):
-        return callable.sample_callable_bed(data["callable_bam"], data["sam_ref"], data["config"])
+        return callable.sample_callable_bed(data["callable_bam"],
+                                            utils.get_in(data, ("reference", "fasta", "base")), data["config"])
     else:
         for key in ["callable_regions", "variant_regions"]:
             intervals = data["config"]["algorithm"].get(key)
@@ -161,13 +160,16 @@ def summarize_grading(samples):
     """
     if not _has_grading_info(samples):
         return samples
+    validate_dir = utils.safe_makedir(os.path.join(samples[0][0]["dirs"]["work"], "validate"))
+    out_csv = os.path.join(validate_dir, "grading-summary.csv")
+    header = ["sample", "caller", "variant.type", "category", "value"]
     out = []
-    out_csv = os.path.join(samples[0][0]["dirs"]["work"],
-                           "grading-summary.csv")
     with open(out_csv, "w") as out_handle:
         writer = csv.writer(out_handle)
-        writer.writerow(["sample", "caller", "variant.type", "category", "value"])
+        writer.writerow(header)
+        plot_num = 0
         for data in (x[0] for x in samples):
+            plot_data = []
             for variant in data.get("variants", []):
                 if variant.get("validate"):
                     variant["validate"]["grading_summary"] = out_csv
@@ -176,7 +178,17 @@ def summarize_grading(samples):
                     for sample_stats in grade_stats:
                         sample = sample_stats["sample"]
                         for vtype, cat, val in _flatten_grading(sample_stats):
-                            writer.writerow([sample, variant.get("variantcaller", ""),
-                                             vtype, cat, val])
+                            row = [sample, variant.get("variantcaller", ""),
+                                   vtype, cat, val]
+                            writer.writerow(row)
+                            plot_data.append(row)
+            plots = (validateplot.create(plot_data, header, plot_num, data["config"],
+                                         os.path.splitext(out_csv)[0])
+                     if plot_data else None)
+            if plots:
+                plot_num += 1
+                for variant in data.get("variants", []):
+                    if variant.get("validate"):
+                        variant["validate"]["grading_plots"] = plots
             out.append([data])
     return out

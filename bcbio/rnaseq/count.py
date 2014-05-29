@@ -10,9 +10,9 @@ import itertools
 try:
     import HTSeq
     import pandas as pd
-    import mygene
+    import gffutils
 except ImportError:
-    HTSeq, pd, mygene = None, None, None
+    HTSeq, pd, gffutils = None, None, None
 
 from bcbio.utils import (file_exists, get_in)
 from bcbio.distributed.transaction import file_transaction
@@ -21,7 +21,8 @@ from bcbio import bam
 
 
 def _get_files(data):
-    in_file = bam.sort(data["work_bam"], data["config"], order="queryname")
+    mapped = bam.mapped(data["work_bam"], data["config"])
+    in_file = bam.sort(mapped, data["config"], order="queryname")
     gtf_file = data["genome_resources"]["rnaseq"]["transcripts"]
     work_dir = data["dirs"].get("work", "work")
     out_dir = os.path.join(work_dir, "htseq-count")
@@ -128,11 +129,8 @@ def htseq_count(data):
                          % feature_type)
 
     try:
-        if bam.is_sam(sam_filename):
-            read_seq = HTSeq.SAM_Reader(sam_filename)
-        elif bam.is_bam(sam_filename):
-            read_seq = HTSeq.BAM_Reader(sam_filename)
-        first_read = iter(read_seq).next()
+        align_reader = htseq_reader(sam_filename)
+        first_read = iter(align_reader).next()
         pe_mode = first_read.paired_end
     except:
         sys.stderr.write("Error occured when reading first line of sam "
@@ -141,8 +139,8 @@ def htseq_count(data):
 
     try:
         if pe_mode:
-            read_seq_pe_file = read_seq
-            read_seq = HTSeq.pair_SAM_alignments(read_seq)
+            read_seq_pe_file = align_reader
+            read_seq = HTSeq.pair_SAM_alignments(align_reader)
         empty = 0
         ambiguous = 0
         notaligned = 0
@@ -305,27 +303,43 @@ def combine_count_files(files, out_file=None):
     df.to_csv(out_file, sep="\t", index_label="id")
     return out_file
 
-def annotate_combined_count_file(count_file, organism, out_file=None):
-    SUPPORTED_ORGANISMS = ["mouse", "human", "rat"]
-    if organism not in SUPPORTED_ORGANISMS:
+def annotate_combined_count_file(count_file, gtf_file, out_file=None):
+    dbfn = gtf_file + ".db"
+    if not file_exists(dbfn):
         return None
 
+    if not gffutils:
+        return None
+
+    db = gffutils.FeatureDB(dbfn, keep_order=True)
+
     if not out_file:
-        out_dir = os.path.join(os.path.dirname(count_file))
+        out_dir = os.path.dirname(count_file)
         out_file = os.path.join(out_dir, "annotated_combined.counts")
 
-    if file_exists(out_file):
-        return out_file
+    # if the genes don't have a gene_id or gene_name set, bail out
+    try:
+        symbol_lookup = {f['gene_id'][0]: f['gene_name'][0] for f in
+                         db.features_of_type('exon')}
+    except KeyError:
+        return None
 
-    df = pd.io.parsers.read_table(count_file, sep="\t", index_col=0)
+    df = pd.io.parsers.read_table(count_file, sep="\t", index_col=0, header=0)
 
-    mg = mygene.MyGeneInfo()
-    out = mg.querymany(df.index.tolist(), scopes='ensembl.gene',
-                       fields='symbol', organism=organism, returnall=True)['out']
-
-    df2 = pd.DataFrame({'symbol': [x.get('symbol', '') for x in out]},
-                       index=[x['query'] for x in out])
-
-    df3 = df.join(df2)
-    df3.to_csv(out_file, sep="\t", index_label="id")
+    df['symbol'] = df.apply(lambda x: symbol_lookup[x.name], axis=1)
+    df.to_csv(out_file, sep="\t", index_label="id")
     return out_file
+
+
+def htseq_reader(align_file):
+    """
+    returns a read-by-read sequence reader for a BAM or SAM file
+    """
+    if bam.is_sam(align_file):
+        read_seq = HTSeq.SAM_Reader(align_file)
+    elif bam.is_bam(align_file):
+        read_seq = HTSeq.BAM_Reader(align_file)
+    else:
+        logger.error("%s is not a SAM or BAM file" % (align_file))
+        sys.exit(1)
+    return read_seq

@@ -7,7 +7,7 @@ import subprocess
 
 from bcbio import bam, utils
 from bcbio.log import logger
-from bcbio.distributed.messaging import run_multicore, zeromq_aware_logging
+from bcbio.distributed.multi import run_multicore, zeromq_aware_logging
 from bcbio.distributed.transaction import file_transaction
 from bcbio.pipeline import config_utils, tools
 from bcbio.provenance import do
@@ -19,21 +19,22 @@ def create_inputs(data):
     machine. Uses gbzip and grabix to prepare an indexed fastq file.
     """
     # skip indexing on samples without input files or not doing alignment
-    if (data["files"][0] is None or data["algorithm"].get("align_split_size") is None
-          or not data["algorithm"].get("aligner")):
+    if ("files" not in data or data["files"][0] is None or
+          data["config"]["algorithm"].get("align_split_size") is None
+          or not data["config"]["algorithm"].get("aligner")):
         return [[data]]
     ready_files = _prep_grabix_indexes(data["files"], data["dirs"], data["config"])
     data["files"] = ready_files
     # bgzip preparation takes care of converting illumina into sanger format
     data["config"]["algorithm"]["quality_format"] = "standard"
-    splits = _find_read_splits(ready_files[0], data["algorithm"]["align_split_size"])
+    splits = _find_read_splits(ready_files[0], data["config"]["algorithm"]["align_split_size"])
     if len(splits) == 1:
         return [[data]]
     else:
         out = []
         for split in splits:
             cur_data = copy.deepcopy(data)
-            cur_data["align_split"] = split
+            cur_data["align_split"] = list(split)
             out.append([cur_data])
         return out
 
@@ -59,7 +60,7 @@ def parallel_multiplier(items):
     """
     multiplier = 1
     for data in (x[0] for x in items):
-        if data["algorithm"].get("align_split_size"):
+        if data["config"]["algorithm"].get("align_split_size"):
             multiplier += 50
     return multiplier
 
@@ -124,13 +125,14 @@ def _find_read_splits(in_file, split_size):
 # ## bgzip and grabix
 
 def _prep_grabix_indexes(in_files, dirs, config):
-    if in_files[0].endswith(".bam") and in_files[1] is None:
+    if in_files[0].endswith(".bam") and len(in_files) == 1 or in_files[1] is None:
         out = _bgzip_from_bam(in_files[0], dirs, config)
     else:
-        out = [_bgzip_from_fastq(x, dirs, config) if x else None for x in in_files]
+        out = run_multicore(_bgzip_from_fastq,
+                            [[{"in_file": x, "dirs": dirs, "config": config}] for x in in_files if x],
+                            config)
     items = [[{"bgzip_file": x, "config": copy.deepcopy(config)}] for x in out if x]
-    run_multicore(_grabix_index, items, config,
-                  config["algorithm"].get("num_cores", 1))
+    run_multicore(_grabix_index, items, config)
     return out
 
 def _bgzip_from_bam(bam_file, dirs, config, is_retry=False):
@@ -201,9 +203,13 @@ def _is_partial_index(gbi_file):
                 return False
     return True
 
-def _bgzip_from_fastq(in_file, dirs, config):
+@utils.map_wrap
+@zeromq_aware_logging
+def _bgzip_from_fastq(data):
     """Prepare a bgzipped file from a fastq input, potentially gzipped (or bgzipped already).
     """
+    in_file = data["in_file"]
+    config = data["config"]
     grabix = config_utils.get_program("grabix", config)
     needs_convert = config["algorithm"].get("quality_format", "").lower() == "illumina"
     if in_file.endswith(".gz"):
@@ -211,11 +217,11 @@ def _bgzip_from_fastq(in_file, dirs, config):
     else:
         needs_bgzip, needs_gunzip = True, False
     if needs_bgzip or needs_gunzip or needs_convert:
-        out_file = _bgzip_file(in_file, dirs, config, needs_bgzip, needs_gunzip,
+        out_file = _bgzip_file(in_file, data["dirs"], config, needs_bgzip, needs_gunzip,
                                needs_convert)
     else:
         out_file = in_file
-    return out_file
+    return [out_file]
 
 def _bgzip_file(in_file, dirs, config, needs_bgzip, needs_gunzip, needs_convert):
     """Handle bgzip of input file, potentially gunzipping an existing file.

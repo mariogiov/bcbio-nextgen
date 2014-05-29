@@ -7,54 +7,54 @@ import copy
 import gzip
 import itertools
 import os
+import subprocess
 
 from bcbio import broad, utils
 from bcbio.bam import ref
-from bcbio.distributed.messaging import run_multicore, zeromq_aware_logging
+from bcbio.distributed.multi import run_multicore, zeromq_aware_logging
 from bcbio.distributed.split import parallel_split_combine
 from bcbio.distributed.transaction import file_transaction
 from bcbio.pipeline import config_utils, shared, tools
 from bcbio.provenance import do
 from bcbio.variation import bamprep
 
-PairedData = namedtuple("PairedData", ["tumor_bam", "tumor_sample_name",
-                                       "normal_bam", "normal_sample_name"])
+# ## Tumor/normal paired cancer analyses
+
+PairedData = namedtuple("PairedData", ["tumor_bam", "tumor_name",
+                                       "normal_bam", "normal_name", "normal_panel"])
 
 def is_paired_analysis(align_bams, items):
-
-    """Determine if bams are from a sample pair or  not"""
-
-    if not (len(align_bams) == 2 and all(item["metadata"].get("phenotype")
-                                         is not None for item in items)):
-        return False
-
-    return True if get_paired_bams(align_bams, items) is not None else False
-
+    """Determine if BAMs are from a tumor/normal paired analysis.
+    """
+    return get_paired_bams(align_bams, items) is not None
 
 def get_paired_bams(align_bams, items):
-
-    """Split aligned bams imn tumor / normal pairs."""
-
-    tumor_bam = None
-    normal_bam = None
-
+    """Split aligned bams into tumor / normal pairs if this is a paired analysis.
+    Allows cases with only tumor BAMs to handle callers that can work without
+    normal BAMs or with normal VCF panels.
+    """
+    tumor_bam, normal_bam, normal_name, normal_panel = None, None, None, None
     for bamfile, item in itertools.izip(align_bams, items):
-
-        metadata = item["metadata"]
-
-        if metadata["phenotype"] == "normal":
+        phenotype = get_paired_phenotype(item)
+        if phenotype == "normal":
             normal_bam = bamfile
-            normal_sample_name = item["name"][1]
-        elif metadata["phenotype"] == "tumor":
+            normal_name = item["name"][1]
+        elif phenotype == "tumor":
             tumor_bam = bamfile
-            tumor_sample_name = item["name"][1]
+            tumor_name = item["name"][1]
+            normal_panel = item["config"]["algorithm"].get("background")
+    if tumor_bam:
+        return PairedData(tumor_bam, tumor_name, normal_bam,
+                          normal_name, normal_panel)
 
-    if tumor_bam is None or normal_bam is None:
-        return
+def get_paired_phenotype(data):
+    """Retrieve the phenotype for a paired tumor/normal analysis.
+    """
+    allowed_names = set(["tumor", "normal"])
+    p = data.get("metadata", {}).get("phenotype")
+    return p if p in allowed_names else None
 
-    return PairedData(tumor_bam, tumor_sample_name, normal_bam,
-                      normal_sample_name)
-
+# ## General utilities
 
 def write_empty_vcf(out_file):
     with open(out_file, "w") as out_handle:
@@ -113,7 +113,7 @@ def exclude_samples(in_file, out_file, to_exclude, ref_file, config):
             bcftools = config_utils.get_program("bcftools", config)
             output_type = "z" if out_file.endswith(".gz") else "v"
             include_str = ",".join(include)
-            cmd = "{bcftools} subset -o {output_type} -s {include_str} {in_file} > {tx_out_file}"
+            cmd = "{bcftools} view -O {output_type} -s {include_str} {in_file} > {tx_out_file}"
             do.run(cmd.format(**locals()), "Exclude samples: {}".format(to_exclude))
     return out_file
 
@@ -156,7 +156,7 @@ def _do_merge(orig_files, out_file, config, region):
                 bcftools = config_utils.get_program("bcftools", config)
                 output_type = "z" if out_file.endswith(".gz") else "v"
                 region_str = "-r {}".format(region) if region else ""
-                cmd = "{bcftools} merge -o {output_type} {region_str} {prep_files} > {tx_out_file}"
+                cmd = "{bcftools} merge -O {output_type} {region_str} {prep_files} > {tx_out_file}"
                 do.run(cmd.format(**locals()), "Merge variants")
     if out_file.endswith(".gz"):
         bgzip_and_index(out_file, config)
@@ -189,14 +189,13 @@ def concat_variant_files(orig_files, out_file, regions, ref_file, config):
     if not utils.file_exists(out_file):
         with file_transaction(out_file) as tx_out_file:
             sorted_files = _sort_by_region(orig_files, regions, ref_file, config)
-            ready_files = [x for x in sorted_files if vcf_has_variants(x)]
-            if len(ready_files) == 0:
-                ready_files = sorted_files[:1]
-            with short_filenames(ready_files) as fs:
-                orig_file_str = " ".join(fs)
-                compress_str = "| bgzip -c " if out_file.endswith(".gz") else ""
-                cmd = "vcfcat {orig_file_str} {compress_str} > {tx_out_file}"
-                do.run(cmd.format(**locals()), "Concatenate variants")
+            input_vcf_file = "%s-files.txt" % os.path.splitext(out_file)[0]
+            with open(input_vcf_file, "w") as out_handle:
+                for fname in sorted_files:
+                    out_handle.write(fname + "\n")
+            compress_str = "| bgzip -c " if out_file.endswith(".gz") else ""
+            cmd = "vcfcat `cat {input_vcf_file}` {compress_str} > {tx_out_file}"
+            do.run(cmd.format(**locals()), "Concatenate variants")
     return out_file
 
 @contextlib.contextmanager
@@ -207,16 +206,12 @@ def short_filenames(fs):
     bam indexes on linked files.
     """
     print fs
-    index_exts = [".bai", ".tbi"]
     with utils.curdir_tmpdir() as tmpdir:
         short_fs = []
         for i, f in enumerate(fs):
             ext = utils.splitext_plus(f)[-1]
             short_f = os.path.relpath(os.path.join(tmpdir, "%s%s" % (i, ext)))
-            os.symlink(f, short_f)
-            for iext in index_exts:
-                if os.path.exists(f + iext):
-                    os.symlink(f + iext, short_f + iext)
+            utils.symlink_plus(f, short_f)
             short_fs.append(short_f)
         yield short_fs
 
@@ -288,15 +283,23 @@ def parallel_combine_variants(orig_files, out_file, ref_file, config, run_parall
 # ## VCF preparation
 
 def bgzip_and_index(in_file, config):
-    """bgzip and tabix index an input VCF file.
+    """bgzip and tabix index an input file, handling VCF and BED.
     """
     out_file = in_file if in_file.endswith(".gz") else in_file + ".gz"
     if not utils.file_exists(out_file):
         with file_transaction(out_file) as tx_out_file:
             bgzip = tools.get_bgzip_cmd(config)
             cmd = "{bgzip} -c {in_file} > {tx_out_file}"
-            do.run(cmd.format(**locals()), "bgzip %s" % os.path.basename(in_file))
-        os.remove(in_file)
+            try:
+                do.run(cmd.format(**locals()), "bgzip %s" % os.path.basename(in_file))
+            except subprocess.CalledProcessError:
+                # Race conditions: ignore errors where file has been deleted by another
+                if os.path.exists(in_file) and not os.path.exists(out_file):
+                    raise
+        try:
+            os.remove(in_file)
+        except OSError:  # Handle cases where run in parallel and file has been deleted
+            pass
     tabix_index(out_file, config)
     return out_file
 
@@ -307,16 +310,27 @@ def p_bgzip_and_index(in_file, config):
     """
     return [bgzip_and_index(in_file, config)]
 
-def tabix_index(in_file, config, preset="vcf"):
+def _guess_preset(f):
+    if f.lower().endswith(".vcf.gz"):
+        return "vcf"
+    elif f.lower().endswith(".bed.gz"):
+        return "bed"
+    elif f.lower().endswith(".gff.gz"):
+        return "gff"
+    else:
+        raise ValueError("Unexpected tabix input: %s" % f)
+
+def tabix_index(in_file, config, preset=None):
     """Index a file using tabix.
     """
+    preset = _guess_preset(in_file) if preset is None else preset
     in_file = os.path.abspath(in_file)
     out_file = in_file + ".tbi"
     if not utils.file_exists(out_file):
         with file_transaction(out_file) as tx_out_file:
             tabix = tools.get_tabix_cmd(config)
             tx_in_file = os.path.splitext(tx_out_file)[0]
-            os.symlink(in_file, tx_in_file)
+            utils.symlink_plus(in_file, tx_in_file)
             cmd = "{tabix} -p {preset} {tx_in_file}"
             do.run(cmd.format(**locals()), "tabix index %s" % os.path.basename(in_file))
     return out_file

@@ -1,14 +1,37 @@
-## 0.7.7 (in progress)
+## 0.7.7 (February 27, 2014)
 
+- For cancer tumor/normal calling, attach final call information of both to
+  the tumor sample. This provides a single downstream file for processing and
+  analysis.
+- Enable batch specification in metadata to be a list, allowing a single normal
+  BAM file to serve as a control for multiple tumor files.
+- Re-organization of parallel framework code to enable alternative approaches.
+  Document plugging in new parallel frameworks. Does not expose changes to users
+  but makes the code cleaner for developers.
+- Default to 1Gb/core memory usage when not specified in any programs. Do not
+  use default baseline if supplied in input file. Thanks to James Porter.
+- Integrate plotting of variant evaluation results using prettyplotlib.
+- Add `globals` option to configuration to avoid needing to specify the same
+  shared file multiple times in a samples configuration.
 - Remove deprecated Celery distributed messaging, replaced in favor of IPython.
 - Remove algorithm/custom_algorithm from bcbio_system.yaml, preferring to set
   these directly in the sample YAML files.
 - Remove outdated and unused custom B-run trimming.
+- Remove ability to guess fastq files from directories with no specification in
+  sample YAML. Prefer using generalized template functionality with explicit
+  specification of files in sample YAML file.
+- Remove deprecated multiplex support, which is outdated and not
+  maintained. Prefer approaches in external tools upstream of bcbio-nextgen.
+- Add `--tag` argument which labels job names on a cluster to help distinguish
+  when multiple bcbio jobs run concurrently. Thanks to Jason Corneveaux.
 - Connect min_read_length parameter with read_through trimming in
   RNA-seq. Thanks to James Porter.
 - Map `variant` calling specification to `variant2` since original approach
   no longer supported.
 - Fix issues with trying to upload directories to Galaxy. Thanks to Jim Peden.
+- Made inner distance calculation for Tophat more accurate.
+- Added gffutils GFF database to the RNA-seq indices.
+- Add gene name annotation from the GFF file instead of from mygene.
 
 ## 0.7.6 (January 15, 2014)
 

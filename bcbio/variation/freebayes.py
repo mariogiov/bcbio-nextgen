@@ -22,7 +22,6 @@ def region_to_freebayes(region):
     else:
         return region
 
-
 def _freebayes_options_from_config(items, aconfig, out_file, region=None):
     opts = []
     opts += ["--ploidy", str(ploidy.get_ploidy(items, region))]
@@ -39,10 +38,10 @@ def _freebayes_options_from_config(items, aconfig, out_file, region=None):
     #    opts += ["--variant-input", background]
     return opts
 
-
 def run_freebayes(align_bams, items, ref_file, assoc_files, region=None,
                   out_file=None):
-
+    """Run FreeBayes variant calling, either paired tumor/normal or germline calling.
+    """
     if is_paired_analysis(align_bams, items):
         call_file = _run_freebayes_paired(align_bams, items, ref_file,
                                           assoc_files, region, out_file)
@@ -52,83 +51,73 @@ def run_freebayes(align_bams, items, ref_file, assoc_files, region=None,
 
     return call_file
 
-
 def _run_freebayes_caller(align_bams, items, ref_file, assoc_files,
-                          region=None,   out_file=None):
+                          region=None, out_file=None):
     """Detect SNPs and indels with FreeBayes.
+
+    Performs post-filtering to remove very low quality variants which
+    can cause issues feeding into GATK. Breaks variants into individual
+    allelic primitives for analysis and evaluation.
     """
     config = items[0]["config"]
     if out_file is None:
         out_file = "%s-variants.vcf" % os.path.splitext(align_bams[0])[0]
     if not file_exists(out_file):
         with file_transaction(out_file) as tx_out_file:
-            cl = [config_utils.get_program("freebayes", config),
-                  "-v", tx_out_file, "-f", ref_file, "--pvar", "0.7"]
             for align_bam in align_bams:
                 bam.index(align_bam, config)
-                cl += ["-b", align_bam]
-            cl += _freebayes_options_from_config(items, config["algorithm"],
-                                                 out_file, region)
-            do.run(cl, "Genotyping with FreeBayes", {})
+            freebayes = config_utils.get_program("freebayes", config)
+            vcffilter = config_utils.get_program("vcffilter", config)
+            vcfallelicprimitives = config_utils.get_program("vcfallelicprimitives", config)
+            vcfstreamsort = config_utils.get_program("vcfstreamsort", config)
+            input_bams = " ".join("-b %s" % x for x in align_bams)
+            opts = " ".join(_freebayes_options_from_config(items, config["algorithm"],
+                                                           out_file, region))
+            cmd = ("{freebayes} -f {ref_file} {input_bams} {opts} | "
+                   "{vcffilter} -f 'QUAL > 5' -s | {vcfallelicprimitives} | {vcfstreamsort} > {tx_out_file}")
+            do.run(cmd.format(**locals()), "Genotyping with FreeBayes", {})
         clean_vcf_output(out_file, _clean_freebayes_output, "nodups")
     ann_file = annotation.annotate_nongatk_vcf(out_file, align_bams,
                                                assoc_files["dbsnp"],
                                                ref_file, config)
     return ann_file
 
-
 def _run_freebayes_paired(align_bams, items, ref_file, assoc_files,
                           region=None, out_file=None):
-
     """Detect SNPs and indels with FreeBayes.
 
     This is used for paired tumor / normal samples.
     """
-
-    config = items[0]["config"]
     if out_file is None:
-        out_file = "%s-variants.vcf" % os.path.splitext(align_bams[0])[0]
-
-    paired = get_paired_bams(align_bams, items)
-
-    vcfsamplediff = config_utils.get_program("vcfsamplediff", config)
-
-    if out_file is None:
-        out_file = "%s-paired-variants.vcf" % os.path.splitext(
-            align_bams[0])[0]
-
+        out_file = "%s-paired-variants.vcf" % os.path.splitext(align_bams[0])[0]
     if not file_exists(out_file):
         with file_transaction(out_file) as tx_out_file:
-
+            paired = get_paired_bams(align_bams, items)
+            if not paired.normal_bam:
+                raise ValueError("Require both tumor and normal BAM files for FreeBayes cancer calling")
+            config = items[0]["config"]
+            vcfsamplediff = config_utils.get_program("vcfsamplediff", config)
             freebayes = config_utils.get_program("freebayes", config)
             opts = " ".join(
                 _freebayes_options_from_config(items, config["algorithm"],
                                                out_file, region))
             opts += " -f {}".format(ref_file)
-
             # NOTE: The first sample name in the vcfsamplediff call is
             # the one supposed to be the *germline* one
-
             cl = ("{freebayes} --pooled-discrete --pvar 0.7"
                   " --genotype-qualities {opts} {paired.tumor_bam}"
                   " {paired.normal_bam} | {vcfsamplediff} -s VT"
-                  " {paired.normal_sample_name} {paired.tumor_sample_name}"
+                  " {paired.normal_name} {paired.tumor_name}"
                   " - >  {tx_out_file}")
-
             bam.index(paired.tumor_bam, config)
             bam.index(paired.normal_bam, config)
-
-            cl = cl.format(**locals())
-
-            do.run(cl, "Genotyping paired variants with FreeBayes", {})
-
+            do.run(cl.format(**locals()), "Genotyping paired variants with FreeBayes", {})
         clean_vcf_output(out_file, _clean_freebayes_output, "nodups")
 
     ann_file = annotation.annotate_nongatk_vcf(out_file, align_bams,
                                                assoc_files["dbsnp"], ref_file,
                                                config)
     return ann_file
-
 
 def _move_vcf(orig_file, new_file):
     """Move a VCF file with associated index.
@@ -137,7 +126,6 @@ def _move_vcf(orig_file, new_file):
         to_move = orig_file + ext
         if os.path.exists(to_move):
             shutil.move(to_move, new_file + ext)
-
 
 def _clean_freebayes_output(line):
     """Clean FreeBayes output to make post-processing with GATK happy.
@@ -158,7 +146,6 @@ def _clean_freebayes_output(line):
             return line
     return None
 
-
 def clean_vcf_output(orig_file, clean_fn, name="clean"):
     """Provide framework to clean a file in-place, with the specified clean
     function.
@@ -168,7 +155,7 @@ def clean_vcf_output(orig_file, clean_fn, name="clean"):
     if not file_exists(out_file):
         with open(orig_file) as in_handle:
             with file_transaction(out_file) as tx_out_file:
-                with open(out_file, "w") as out_handle:
+                with open(tx_out_file, "w") as out_handle:
                     for line in in_handle:
                         update_line = clean_fn(line)
                         if update_line:

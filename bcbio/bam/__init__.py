@@ -98,6 +98,26 @@ def is_sam(in_file):
     else:
         return False
 
+def mapped(in_bam, config):
+    """
+    return a bam file of only the mapped reads
+    """
+    out_file = os.path.splitext(in_bam)[0] + ".mapped.bam"
+    if utils.file_exists(out_file):
+        return out_file
+    sambamba = _get_sambamba(config)
+    with file_transaction(out_file) as tx_out_file:
+        if sambamba:
+            cmd = ("{sambamba} view --format=bam -F 'not (unmapped or mate_is_unmapped)' "
+                   "{in_bam} -o {tx_out_file}")
+        else:
+            samtools = config_utils.get_program("samtools", config)
+            cmd = "{samtools} view -b -F 4 {in_bam} -o {tx_out_file}"
+        do.run(cmd.format(**locals()),
+               "Filtering mapped reads to %s." % (tx_out_file))
+    return out_file
+
+
 def count(in_bam, config=None):
     """
     return the counts in a BAM file
@@ -147,6 +167,14 @@ def bam_to_sam(in_file, config):
         do.run(cmd.format(**locals()),
                ("Convert BAM to SAM (%s cores): %s to %s"
                 % (str(num_cores), in_file, out_file)))
+    return out_file
+
+def reheader(header, bam_file, config):
+    samtools = config_utils.get_program("samtools", config)
+    base, ext = os.path.splitext(bam_file)
+    out_file = base + ".reheadered" + ext
+    cmd = "{samtools} reheader {header} {bam_file} > {out_file}"
+    do.run(cmd.format(**locals()), "Reheadering %s." % bam_file)
     return out_file
 
 
@@ -245,3 +273,4 @@ def sample_name(in_bam):
         if line.startswith("@RG"):
             name = [x.split(":")[1] for x in line.split() if x.split(":")[0] == "SM"]
     return name[0] if name else None
+
