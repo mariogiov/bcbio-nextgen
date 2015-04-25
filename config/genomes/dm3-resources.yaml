@@ -1,0 +1,5 @@
+version: 3
+
+aliases:
+  ensembl: drosophila_melanogaster
+  snpeff: BDGP5.78

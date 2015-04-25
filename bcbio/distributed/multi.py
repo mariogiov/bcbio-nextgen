@@ -23,7 +23,7 @@ def runner(parallel, config):
         logger.info("multiprocessing: %s" % fn_name)
         fn = get_fn(fn_name, parallel)
         if "wrapper" in parallel:
-            wrap_parallel = {k: v for k, v in parallel.items() if k in set(["fresources"])}
+            wrap_parallel = {k: v for k, v in parallel.items() if k in set(["fresources", "checkpointed"])}
             items = [[fn_name] + parallel.get("wrapper_args", []) + [wrap_parallel] + list(x) for x in items]
         return run_multicore(fn, items, config, parallel=parallel)
     return run_parallel
@@ -51,6 +51,8 @@ def zeromq_aware_logging(f):
                 break
             elif config_utils.is_nested_config_arg(arg):
                 config = arg["config"]
+            elif isinstance(arg, (list, tuple)) and config_utils.is_nested_config_arg(arg[0]):
+                config = arg[0]["config"]
                 break
         assert config, "Could not find config dictionary in function arguments."
         if config.get("parallel", {}).get("log_queue") and not config.get("parallel", {}).get("wrapper"):

@@ -1,28 +1,42 @@
 """Multiprocessing ready entry points for sample analysis.
 """
-from bcbio import structural, utils, chipseq
+from bcbio import structural, utils, chipseq, upload
 from bcbio.bam import callable
+from bcbio.rnaseq import (sailfish, express)
 from bcbio.ngsalign import alignprep
-from bcbio.pipeline import (disambiguate, lane, qcsummary, sample, shared, variation,
-                            rnaseq)
-from bcbio.variation import (bamprep, coverage, realign, genotype, ensemble, multi, population,
-                             recalibrate, validate, vcfutils)
+from bcbio.pipeline import (archive, disambiguate, qcsummary, sample,
+                            main, shared, variation, run_info, rnaseq)
+from bcbio.variation import (bamprep, bedutils, coverage, genotype, ensemble,
+                             joint, multi, population, recalibrate, validate,
+                             vcfutils)
 
 @utils.map_wrap
-def process_lane(*args):
-    return lane.process_lane(*args)
+def run_sailfish(*args):
+    return sailfish.run_sailfish(*args)
 
 @utils.map_wrap
-def trim_lane(*args):
-    return lane.trim_lane(*args)
+def prepare_sample(*args):
+    return sample.prepare_sample(*args)
+
+@utils.map_wrap
+def prepare_bcbio_samples(*args):
+    return sample.prepare_bcbio_samples(*args)
+
+@utils.map_wrap
+def trim_sample(*args):
+    return sample.trim_sample(*args)
 
 @utils.map_wrap
 def process_alignment(*args):
-    return lane.process_alignment(*args)
+    return sample.process_alignment(*args)
 
 @utils.map_wrap
 def postprocess_alignment(*args):
-    return lane.postprocess_alignment(*args)
+    return sample.postprocess_alignment(*args)
+
+@utils.map_wrap
+def prep_samples(*args):
+    return sample.prep_samples(*args)
 
 @utils.map_wrap
 def prep_align_inputs(*args):
@@ -45,14 +59,6 @@ def prep_recal(*args):
     return recalibrate.prep_recal(*args)
 
 @utils.map_wrap
-def write_recal_bam(*args):
-    return recalibrate.write_recal_bam(*args)
-
-@utils.map_wrap
-def realign_sample(*args):
-    return realign.realign_sample(*args)
-
-@utils.map_wrap
 def split_variants_by_sample(*args):
     return multi.split_variants_by_sample(*args)
 
@@ -65,6 +71,10 @@ def pipeline_summary(*args):
     return qcsummary.pipeline_summary(*args)
 
 @utils.map_wrap
+def qsignature_summary(*args):
+    return qcsummary.qsignature_summary(*args)
+
+@utils.map_wrap
 def generate_transcript_counts(*args):
     return rnaseq.generate_transcript_counts(*args)
 
@@ -73,8 +83,24 @@ def run_cufflinks(*args):
     return rnaseq.run_cufflinks(*args)
 
 @utils.map_wrap
-def generate_bigwig(*args):
-    return sample.generate_bigwig(*args)
+def run_stringtie_expression(*args):
+    return rnaseq.run_stringtie_expression(*args)
+
+@utils.map_wrap
+def run_express(*args):
+    return rnaseq.run_express(*args)
+
+@utils.map_wrap
+def run_dexseq(*args):
+    return rnaseq.run_dexseq(*args)
+
+@utils.map_wrap
+def run_rnaseq_variant_calling(*args):
+    return rnaseq.run_rnaseq_variant_calling(*args)
+
+@utils.map_wrap
+def run_rnaseq_joint_genotyping(*args):
+    return rnaseq.run_rnaseq_joint_genotyping(*args)
 
 @utils.map_wrap
 def combine_bam(*args):
@@ -101,6 +127,10 @@ def detect_sv(*args):
     return structural.detect_sv(*args)
 
 @utils.map_wrap
+def finalize_sv(*args):
+    return structural.finalize_sv(*args)
+
+@utils.map_wrap
 def combine_calls(*args):
     return ensemble.combine_calls(*args)
 
@@ -110,11 +140,15 @@ def prep_gemini_db(*args):
 
 @utils.map_wrap
 def combine_bed(*args):
-    return callable.combine_bed(*args)
+    return bedutils.combine(*args)
 
 @utils.map_wrap
 def calc_callable_loci(*args):
     return callable.calc_callable_loci(*args)
+
+@utils.map_wrap
+def combine_sample_regions(*args):
+    return callable.combine_sample_regions(*args)
 
 @utils.map_wrap
 def compare_to_rm(*args):
@@ -129,5 +163,44 @@ def run_disambiguate(*args):
     return disambiguate.run(*args)
 
 @utils.map_wrap
+def disambiguate_split(*args):
+    return disambiguate.split(*args)
+
+@utils.map_wrap
+def disambiguate_merge_extras(*args):
+    return disambiguate.merge_extras(*args)
+
+@utils.map_wrap
 def clean_chipseq_alignment(*args):
     return chipseq.clean_chipseq_alignment(*args)
+
+@utils.map_wrap
+def archive_to_cram(*args):
+    return archive.to_cram(*args)
+
+@utils.map_wrap
+def square_batch_region(*args):
+    return joint.square_batch_region(*args)
+
+@utils.map_wrap
+def cufflinks_assemble(*args):
+    return rnaseq.cufflinks_assemble(*args)
+
+@utils.map_wrap
+def cufflinks_merge(*args):
+    return rnaseq.cufflinks_merge(*args)
+
+@utils.map_wrap
+def organize_samples(*args):
+    return run_info.organize(*args)
+
+@utils.map_wrap
+def upload_samples(*args):
+    return upload.from_sample(*args)
+
+@utils.map_wrap
+def run_main(*args):
+    work_dir, ready_config_file, systemconfig, fcdir, parallel, samples = args
+    return main.run_main(work_dir, run_info_yaml=ready_config_file,
+                         config_file=systemconfig, fc_dir=fcdir,
+                         parallel=parallel, samples=samples)

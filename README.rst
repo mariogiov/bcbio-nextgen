@@ -1,14 +1,13 @@
 bcbio-nextgen
 -------------
 
-A python toolkit providing best-practice pipelines for fully automated
-high throughput sequencing analysis. You write a high level
-configuration file specifying your inputs and analysis parameters.
-This input drives a parallel run that handles distributed
-execution, idempotent processing restarts and safe transactional
-steps. The goal is to provide a shared community resource that handles
-the data processing component of sequencing analysis, providing
-researchers with more time to focus on the downstream biology.
+Validated, scalable, community developed variant calling and RNA-seq analysis.
+You write a high level configuration file specifying your inputs and analysis
+parameters.  This input drives a parallel run that handles distributed
+execution, idempotent processing restarts and safe transactional steps.
+bcbio-nextgen provides a shared community resource that handles the data processing
+component of sequencing analysis, providing researchers with more time to focus
+on the downstream biology.
 
 Features
 --------
@@ -44,7 +43,7 @@ Features
 .. _developer documentation: https://bcbio-nextgen.readthedocs.org/en/latest/contents/code.html
 .. _variant calling and RNA-seq pipelines: https://bcbio-nextgen.readthedocs.org/en/latest/contents/pipelines.html
 .. _parallel analysis and scaling: http://bcbio.wordpress.com/2013/05/22/scaling-variant-detection-pipelines-for-whole-genome-sequencing-analysis/
-.. _Automated validation: http://bcbio.wordpress.com/2013/05/06/framework-for-evaluating-variant-detection-methods-comparison-of-aligners-and-callers/
+.. _Automated validation: http://bcbio.wordpress.com/2014/05/12/wgs-trio-variant-evaluation/
 
 Quick start
 -----------
@@ -52,7 +51,8 @@ Quick start
 1. `Install`_ ``bcbio-nextgen`` with all tool dependencies and data files::
 
          wget https://raw.github.com/chapmanb/bcbio-nextgen/master/scripts/bcbio_nextgen_install.py
-         python bcbio_nextgen_install.py /usr/local/share/bcbio-nextgen --tooldir=/usr/local
+         python bcbio_nextgen_install.py /usr/local/share/bcbio --tooldir=/usr/local \
+           --genomes GRCh37 --aligners bwa --aligners bowtie2
 
    producing an editable `system configuration file`_ referencing the installed
    software, data and system information.
@@ -91,12 +91,21 @@ Contributors
 
 - `Miika Ahdesmaki`_, AstraZeneca
 - `Luca Beltrame`_, IRCCS "Mario Negri" Institute for Pharmacological Research, Milan, Italy
+- `Alla Bushoy`_, AstraZeneca
 - `Guillermo Carrasco`_, Science for Life Laboratory, Stockholm
-- `Brad Chapman`_, Harvard School of Public Health
+- `Nick Carriero <http://www.simonsfoundation.org/about-us/staff/staff-bios/#nick-carriero-ph-d>`_, Simons Foundation
+- `Brad Chapman`_, Harvard Chan Bioinformatics Core
+- `Saket Choudhary`_, University Of Southern California
 - `Peter Cock`_, The James Hutton Institute
+- `Matt Edwards`_, MIT
 - `Mario Giovacchini`_, Science for Life Laboratory, Stockholm
-- `Rory Kirchner`_, Harvard School of Public Health
+- `Karl Gutwin <https://twitter.com/kgutwin>`_, Biogen
+- `Jeff Hammerbacher`_, Icahn School of Medicine at Mount Sinai
+- `John Kern <https://github.com/kern3020>`_
+- `Rory Kirchner`_, Harvard Chan Bioinformatics Core
 - `Jakub Nowacki`_, AstraZeneca
+- `John Morrissey <https://github.com/jwm>`_, Harvard Chan Bioinformatics Core
+- `Lorena Pantano <https://github.com/lpantano>`_, Harvard Chan Bioinformatics Core
 - `Brent Pedersen`_, University of Colorado Denver
 - `James Porter`_, The University of Chicago
 - `Valentine Svensson`_, Science for Life Laboratory, Stockholm
@@ -107,6 +116,7 @@ Contributors
 .. _Miika Ahdesmaki: https://github.com/mjafin
 .. _Luca Beltrame: https://github.com/lbeltrame
 .. _Guillermo Carrasco: https://github.com/guillermo-carrasco
+.. _Alla Bushoy: https://github.com/abushoy
 .. _Brad Chapman: https://github.com/chapmanb
 .. _Peter Cock: https://github.com/peterjc
 .. _Mario Giovacchini: https://github.com/mariogiov
@@ -118,6 +128,9 @@ Contributors
 .. _Paul Tang: https://github.com/tanglingfung
 .. _Roman Valls: https://github.com/brainstorm
 .. _Kevin Ying: https://github.com/kevyin
+.. _Jeff Hammerbacher: https://github.com/hammer
+.. _Matt Edwards: https://github.com/matted
+.. _Saket Choudhary: https://github.com/saketkc
 
 License
 -------

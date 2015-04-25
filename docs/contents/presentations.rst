@@ -1,40 +1,55 @@
 Presentations
 =============
 
-Bioinformatics Open Source Conference 2013
-------------------------------------------
+- `Boston Computational Biology and Bioinformatics meetup
+  <http://www.meetup.com/Boston-Computational-Biology-and-Bioinformatics-Meetup/events/220328870/>`_
+  (1 April 2015): `slides <https://github.com/chapmanb/bcbb/blob/master/talks/bcbb2015_bcbio/chapman_bcbio.pdf>`_
 
--  `BOSC 2013 Slides`_
--  `BOSC 2013 Video`_
--  `BOSC 2013 Conference website`_
+- `Program in Genetic Epidemiology and Statistical Genetics seminar series
+  <http://www.hsph.harvard.edu/program-molecular-genetic-epidemiology/journal-club/>`_ at
+  Harvard Chan School (6 February 2015): `slides <https://github.com/chapmanb/bcbb/raw/master/talks/pgsg2015_bcbio/chapman_bcbio.pdf>`_
 
-Arvados Summit 2013
--------------------
+- Talk at `Good Start Genetics <https://www.goodstartgenetics.com/>`_ (23
+  January 2015): `slides <https://github.com/chapmanb/bcbb/raw/master/talks/gsg2015_bcbio_nextgen/chapman_bcbio.pdf>`_
 
--  `Arvados Summit Slides`_
--  `Arvados Summit website`_
+- Boston area `Bioinformatics Interest Group <http://openwetware.org/wiki/BioMicroCenter:BIG_meeting>`_ (15 October 2014):
+  `slides <https://github.com/chapmanb/bcbb/raw/master/talks/big2014_bcbio_val/chapman_bcbio.pdf>`_
 
-Scientific Python 2013
-----------------------
+- University of Georgia `Institute of Bioinformatics
+  <http://iob.uga.edu/event/bioinformatics-seminar-12/>`_ (12 September 2014):
+  `slides <https://github.com/chapmanb/bcbb/raw/master/talks/uga2014_bcbio_open/chapman_bcbio.pdf>`_
 
--  `SciPy 2013 Video`_
--  `SciPy 2013 Conference website`_
+- Intel Life Sciences discussion (7 August 2014): `slides <https://github.com/chapmanb/bcbb/raw/master/talks/intel2014_bcbio/chapman_bcbio.pdf>`_
 
-Genome Informatics 2013
------------------------
+- Bioinformatics Open Source Conference (BOSC) 2014: `slides
+  <https://github.com/chapmanb/bcbb/raw/master/talks/bosc2014_bcbio/chapman_bcbio.pdf>`_,
+  `conference website <http://www.open-bio.org/wiki/BOSC_2014>`_
 
--  `GI 2013 Presentation slides`_
+- Galaxy Community Conference 2014: `slides
+  <https://github.com/chapmanb/bcbb/raw/master/talks/gcc2014_bcbio/chapman_bcbio.pdf>`_,
+  `conference website <https://wiki.galaxyproject.org/Events/GCC2014>`_
 
-Mt Sinai: Strategies for accelerating the genomic sequencing pipeline
----------------------------------------------------------------------
+- `bcbio hackathon at Biogen`_ (3 June 2014)
 
-- `Mt Sinai workshop slides`_
-- `Mt Sinai workshop website`_
+- `Harvard ABCD group slides`_ (17 April 2014)
 
-Non-conference talks
---------------------
+- `BIG meeting`_ (February 2014)
 
 - `Novartis slides`_ (21 January 2014)
+
+- Mt Sinai: Strategies for accelerating the genomic sequencing pipeline: `Mt Sinai workshop slides`_,
+  `Mt Sinai workshop website`_
+
+- Genome Informatics 2013 `GI 2013 Presentation slides`_
+
+- Bioinformatics Open Source Conference 2013: `BOSC 2013 Slides`_, `BOSC 2013
+  Video`_, `BOSC 2013 Conference website`_
+
+- Arvados Summit 2013: `Arvados Summit Slides`_, `Arvados Summit website`_
+
+- Scientific Python 2013: `SciPy 2013 Video`_, `SciPy 2013 Conference website`_
+
+Feel free to reuse any images or text from these talks. The `slides are on GitHub`_.
 
 Abstract
 ~~~~~~~~
@@ -131,3 +146,7 @@ Links from the presentation
 .. _Mt Sinai workshop website: http://www.hpcwire.com/event/strategies-accelerating-genomic-sequencing-pipeline/
 .. _Mt Sinai workshop slides: https://github.com/chapmanb/bcbb/raw/master/talks/mtsinai2013_bcbio_nextgen/chapman_mtsinai_bcbio.pdf
 .. _Novartis slides: https://github.com/chapmanb/bcbb/raw/master/talks/novartis2014_bcbio_nextgen/chapman_bcbio.pdf
+.. _BIG meeting: https://github.com/roryk/spliced-blog/blob/master/talks/BIG-meeting-feb-2014.pdf
+.. _Harvard ABCD group slides: https://github.com/chapmanb/bcbb/raw/master/talks/abcd2014_bcbio_nextgen/chapman_bcbio.pdf
+.. _bcbio hackathon at Biogen: https://github.com/chapmanb/bcbb/raw/master/talks/biogen2014_bcbio_nextgen/chapman_bcbio.pdf
+.. _slides are on GitHub: https://github.com/chapmanb/bcbb/tree/master/talks

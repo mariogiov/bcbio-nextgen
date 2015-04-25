@@ -22,15 +22,16 @@ Contents:
 
    contents/introduction
    contents/installation
+   contents/pipelines
    contents/testing
    contents/configuration
    contents/parallel
-   contents/pipelines
+   contents/cloud
    contents/outputs
    contents/code
+   contents/sequencer
    contents/internals
    contents/presentations
-   contents/deprecated
 
 
 Indices and tables

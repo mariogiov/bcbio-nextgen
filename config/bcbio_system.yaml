@@ -14,8 +14,16 @@
 # - dir: Directory containing program associated data. Especially useful for
 #        java jars
 resources:
+  # default options, used if other items below are not present
+  # avoids needing to configure/adjust for every program
+  default:
+    memory: 2G
+    cores: 16
+    jvm_opts: ["-Xms750", "-Xmx2000m"]
   log:
     dir: log
+  tmp:
+    dir: null
   ucsc_bigwig:
     memory: 36g
   bwa:
@@ -27,26 +35,29 @@ resources:
   star:
     memory: 2g
     cores: 16
-  novoalign:
+  snap:
     cores: 16
-    memory: 2G
-  gemini:
-    cores: 16
-  freebayes:
+    memory: 4G
+  kraken:
+    cores: 6
+    memory: 4g
+  qsignature:
+    cores: 1
     memory: 2g
+  qsnp:
+    jvm_opts: ["-Xms750m", "-Xmx6g"]
   gatk:
-    jvm_opts: ["-Xms750m", "-Xmx2500m"]
+    jvm_opts: ["-Xms500m", "-Xmx3500m"]
     dir: /usr/local/share/java/gatk
   gatk-haplotype:
-    jvm_opts: ["-Xms2g", "-Xmx5500m"]
+    jvm_opts: ["-Xms500m", "-Xmx3500m"]
   gatk-vqsr:
-    jvm_opts: ["-Xms2g", "-Xmx4000m"]
+    jvm_opts: ["-Xms500m", "-Xmx3500m"]
   picard:
-    jvm_opts: ["-Xms750m", "-Xmx2500m"]
+    jvm_opts: ["-Xms750m", "-Xmx3500m"]
     dir: /usr/local/share/java/picard
   snpeff:
     jvm_opts: ["-Xms750m", "-Xmx6g"]
-    dir: /usr/local/share/java/snpeff
   bcbio_variation:
     jvm_opts: ["-Xms750m", "-Xmx2500m"]
     dir: /usr/local/share/java/bcbio_variation
@@ -59,27 +70,18 @@ resources:
   varscan:
     jvm_opts: ["-Xms750m", "-Xmx2000m"]
     dir: /usr/local/share/java/varscan
+  vardict:
+    jvm_opts: ["-Xms750m", "-Xmx4000m"]
   oncofuse:
     jvm_opts: ["-Xms750m", "-Xmx2000m"]
     dir: /usr/local/share/java/oncofuse
-  AlienTrimmer:
-    jvm_opts: ["-Xms750m", "-Xmx2000m"]
-    dir: /usr/local/share/java/AlienTrimmer
-  bowtie2:
-    cores: 16
-  tophat2:
-    cores: 16
-  cufflinks:
-    cores: 16
-  bowtie:
-    cores: 16
-  tophat:
-    cores: 16
+  express:
+    memory: 8g
 
 # Location of galaxy configuration file, which has pointers to reference data
 # https://bcbio-nextgen.readthedocs.org/en/latest/contents/configuration.html#reference-genome-files
 galaxy_config: universe_wsgi.ini
-    
+
 # -- Additional options for specific integration, not required for standalone usage.
 
 # Galaxy integration. Required for retrieving information from Galaxy LIMS.
@@ -97,7 +99,3 @@ galaxy_config: universe_wsgi.ini
 #   store_dir: /store4/solexadata
 #   base_dir: /array0/projects/Sequencing
 #   worker_program: nextgen_analysis_server.py
-
-# ## Back compatible algorithm section, to be removed in 0.7.7 release
-algorithm:
-  platform: illumina

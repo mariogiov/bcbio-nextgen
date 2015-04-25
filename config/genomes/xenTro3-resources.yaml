@@ -1,0 +1,5 @@
+version: 2
+
+aliases:
+  ensembl: xenopus_tropicalis
+  snpeff: JGI_4.2.78

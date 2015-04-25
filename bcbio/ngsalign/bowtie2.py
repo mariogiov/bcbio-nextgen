@@ -3,17 +3,16 @@
 http://bowtie-bio.sourceforge.net/bowtie2/index.shtml
 """
 import os
-from itertools import ifilter, imap
+from itertools import ifilter
 import pysam
-import sys
 
 from bcbio.pipeline import config_utils
-from bcbio.utils import file_exists, compose
+from bcbio.utils import file_exists
 from bcbio.distributed.transaction import file_transaction
 from bcbio.provenance import do
 from bcbio import bam
-
-
+from bcbio.pipeline import datadict as dd
+from bcbio.rnaseq import gtf
 
 def _bowtie2_args_from_config(config):
     """Configurable high level options for bowtie2.
@@ -32,11 +31,11 @@ def align(fastq_file, pair_file, ref_file, names, align_dir, data,
     """Alignment with bowtie2.
     """
     config = data["config"]
-    analysis_config = ANALYSIS.get(data["analysis"])
+    analysis_config = ANALYSIS.get(data["analysis"].lower())
     assert analysis_config, "Analysis %s is not supported by bowtie2" % (data["analysis"])
     out_file = os.path.join(align_dir, "%s.sam" % names["lane"])
     if not file_exists(out_file):
-        with file_transaction(out_file) as tx_out_file:
+        with file_transaction(data, out_file) as tx_out_file:
             cl = [config_utils.get_program("bowtie2", config)]
             cl += _bowtie2_args_from_config(config)
             cl += extra_args if extra_args is not None else []
@@ -48,6 +47,11 @@ def align(fastq_file, pair_file, ref_file, names, align_dir, data,
             else:
                 cl += ["-U", fastq_file]
             cl += ["-S", tx_out_file]
+            if names and "rg" in names:
+                cl += ["--rg-id", names["rg"]]
+                for key, tag in [("sample", "SM"), ("pl", "PL"), ("pu", "PU")]:
+                    if key in names:
+                        cl += ["--rg", "%s:%s" % (tag, names[key])]
             cl = [str(i) for i in cl]
             do.run(cl, "Aligning %s and %s with Bowtie2." % (fastq_file, pair_file),
                    None)
@@ -97,4 +101,42 @@ def _is_unique(read):
 
 
 ANALYSIS = {"chip-seq": {"params": ["-X", 2000]},
-            "RNA-seq": {"params": ["--sensitive", "-X", 2000]}}
+            "variant2": {"params": ["-X", 2000]},
+            "standard": {"params": ["-X", 2000]},
+            "rna-seq": {"params": ["--sensitive", "-X", 2000]}}
+
+def index_transcriptome(gtf_file, ref_file, data):
+    """
+    use a GTF file and a reference FASTA file to index the transcriptome
+    """
+    gtf_fasta = gtf.gtf_to_fasta(gtf_file, ref_file)
+    bowtie2_index = os.path.splitext(gtf_fasta)[0]
+    bowtie2_build = config_utils.get_program("bowtie2", data["config"]) + "-build"
+    cmd = "{bowtie2_build} --offrate 1 {gtf_fasta} {bowtie2_index}".format(**locals())
+    message = "Creating transcriptome index of %s with bowtie2." % (gtf_fasta)
+    do.run(cmd, message)
+    return bowtie2_index
+
+
+def align_transcriptome(fastq_file, pair_file, ref_file, data):
+    """
+    bowtie2 with settings for aligning to the transcriptome for eXpress/RSEM/etc
+    """
+    work_bam = dd.get_work_bam(data)
+    base, ext = os.path.splitext(work_bam)
+    out_file = base + ".transcriptome" + ext
+    if file_exists(out_file):
+        data = dd.set_transcriptome_bam(data, out_file)
+        return data
+    bowtie2 = config_utils.get_program("bowtie2", data["config"])
+    gtf_file = dd.get_gtf_file(data)
+    gtf_index = index_transcriptome(gtf_file, ref_file, data)
+    num_cores = data["config"]["algorithm"].get("num_cores", 1)
+    fastq_cmd = "-1 %s" % fastq_file if pair_file else "-U %s" % fastq_file
+    pair_cmd = "-2 %s " % pair_file if pair_file else ""
+    cmd = ("{bowtie2} -p {num_cores} -a -X 600 --rdg 6,5 --rfg 6,5 --score-min L,-.6,-.4 --no-discordant --no-mixed -x {gtf_index} {fastq_cmd} {pair_cmd} | samtools view -hbS - > {tx_out_file}")
+    with file_transaction(out_file) as tx_out_file:
+        message = "Aligning %s and %s to the transcriptome." % (fastq_file, pair_file)
+        do.run(cmd.format(**locals()), message)
+    data = dd.set_transcriptome_bam(data, out_file)
+    return data

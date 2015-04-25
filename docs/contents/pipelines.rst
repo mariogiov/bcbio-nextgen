@@ -1,54 +1,167 @@
 Pipelines
 ---------
 
-Variant calling
-~~~~~~~~~~~~~~~
+Germline variant calling
+~~~~~~~~~~~~~~~~~~~~~~~~
 
-bcbio-nextgen implements configurable best-practice pipelines for SNP
-and small indel calling:
+bcbio implements configurable SNP, indel and structural variant calling. We
+include whole genome and exome evaluations against reference calls from
+the `Genome in a Bottle`_ consortium, enabling continuous assessment of new
+alignment and variant calling algorithms. We regularly report on these
+comparisons and continue to improve approaches as the community makes new
+tools available. Here is some of the research that contributes to the
+current implementation:
 
--  Sequence alignment:
+- An introduction to the `variant evaluation framework`_. This includes a
+  comparison of the `bwa mem`_ and `novoalign`_ aligners. We also compared the
+  `FreeBayes`_, `GATK HaplotypeCaller`_ and `GATK UnifiedGenotyper`_ variant
+  callers.
 
-   - `bwa mem`_
-   - `novoalign`_
-   - `bowtie2`_
-   - `mosaik`_
+- An in-depth evaluation of `FreeBayes and BAM post-alignment processing`_. We
+  found that FreeBayes quality was equal to GATK HaplotypeCaller. Additionally,
+  a lightweight post-alignment preparation method using only de-duplication was
+  equivalent to GATK's recommended Base Quality Score Recalibration (BQSR) and
+  realignment around indels, when using good quality input datasets and callers
+  that do local realignment.
 
--  Base Quality Recalibration
--  Realignment around indels
--  Variant calling:
+- Additional work to `improve variant filtering`_, providing methods to
+  remove low complexity regions (LCRs) that can bias indel results. We also
+  tuned `GATK's Variant Quality Score Recalibrator`_ (VQSR) and compared it with
+  hard filtering. VQSR requires a large number of variants and we use
+  it in bcbio with GATK HaplotypeCaller when your :ref:`algorithm-config`
+  contains high depth samples (``coverage_depth`` is not low) and you are
+  calling on the whole genome (``coverage_interval`` is genome) or have more
+  than 50 regional or exome samples called concurrently.
 
-   -  `GATK Unified Genotyper`_ (supports both GATK-lite in GATK 2.3
-      and commercial restricted version in GATK 2.4+)
-   -  `GATK Haplotype caller`_ (part of the commercially restricted GATK 2.4+)
-   -  `FreeBayes`_
-   -  `samtools mpileup`_
-   -  `cortex\_var`_
-   -  `VarScan`_
+- `Validation of structural variant detection`_ using multiple calling
+  methods. This implements a pipeline that works in tandem with SNP and indel
+  calling to detect larger structural variations like deletions, duplications,
+  inversions and copy number variants (CNVs).
 
--  Paired tumor / normal variant calling:
+- An `evaluation of joint calling`_ with GATK HaplotypeCaller, FreeBayes,
+  Platypus and samtools. This validates the joint calling implementation,
+  allowing scaling of large population germline experiments. It also
+  demonstrates improved performance of new callers: samtools 1.0 and Platypus.
 
-   - `MuTect`_ (version 1.1.5 and above)
-   - `VarScan`_
+bcbio automates post-variant calling annotation to make
+the outputs easier to feed directly into your biological analysis. We annotate
+variant effects using `snpEff`_ or `Variant Effect Predictor`_ (VEP), and
+prepare a `GEMINI database`_ that associates variants with multiple
+external annotations in a SQL-based query interface.
 
--  Quality filtering, using either hard filtering or
-   `GATK's Variant Quality Score Recalibrator`_ (VQSR). VQSR
-   requires a large number of variants. Practically this means high
-   depth whole genome variant calling experiments. bcbio-nextgen
-   attempts VQSR with the following :ref:`algorithm-config`
+.. _Genome in a Bottle: http://www.genomeinabottle.org/
+.. _variant evaluation framework: https://bcb.io/2013/05/06/framework-for-evaluating-variant-detection-methods-comparison-of-aligners-and-callers/
+.. _FreeBayes and BAM post-alignment processing: https://bcb.io/2013/10/21/updated-comparison-of-variant-detection-methods-ensemble-freebayes-and-minimal-bam-preparation-pipelines/
+.. _improve variant filtering: http://bcb.io/2014/05/12/wgs-trio-variant-evaluation/
+.. _Validation of structural variant detection: http://bcb.io/2014/08/12/validated-whole-genome-structural-variation-detection-using-multiple-callers/
 
-   - ``variantcaller`` is gatk or gatk-haplotype
-   - ``coverage_depth`` is not low
-   - ``coverage_interval`` is genome
+.. _GATK UnifiedGenotyper: http://www.broadinstitute.org/gatk/gatkdocs/org_broadinstitute_sting_gatk_walkers_genotyper_UnifiedGenotyper.html
+.. _GATK HaplotypeCaller: http://www.broadinstitute.org/gatk/gatkdocs/org_broadinstitute_sting_gatk_walkers_haplotypecaller_HaplotypeCaller.html
+.. _samtools mpileup: http://samtools.sourceforge.net/mpileup.shtml
+.. _GATK's Variant Quality Score Recalibrator: http://www.broadinstitute.org/gatk/gatkdocs/org_broadinstitute_sting_gatk_walkers_variantrecalibration_VariantRecalibrator.html
+.. _bwa mem: http://bio-bwa.sourceforge.net/
+.. _novoalign: http://www.novocraft.com
+.. _snpEff: http://snpeff.sourceforge.net/
+.. _GEMINI database: http://gemini.readthedocs.org/en/latest/
+.. _Variant Effect Predictor: http://www.ensembl.org/info/docs/tools/vep/index.html
+.. _evaluation of joint calling: http://bcb.io/2014/10/07/joint-calling/
 
--  Annotation of variant effects, using `snpEff`_
--  Variant exploration and prioritization, using `GEMINI`_
+Basic germline calling
+======================
 
-It follows approaches from:
+The best approach to build a bcbio :ref:`docs-config` for germline calling is to use
+the :ref:`automated-sample-config` with one of the default templates:
 
-- `GATK best practice`_ guidelines for variant calling
-- Marth Lab's `gkno pipelines`_
+- `FreeBayes template
+  <https://github.com/chapmanb/bcbio-nextgen/blob/master/config/templates/freebayes-variant.yaml>`_ --
+  Call variants using FreeBayes with a minimal preparation pipeline. This is a
+  freely available unrestricted pipeline fully included in the bcbio installation.
 
+- `GATK HaplotypeCaller template
+  <https://github.com/chapmanb/bcbio-nextgen/blob/master/config/templates/gatk-variant.yaml>`_ --
+  Run GATK best practices, including Base Quality Score Recalibration,
+  realignment and HaplotypeCaller variant calling. This requires a license from
+  Broad for commercial use. You need to manually install GATK along with bcbio
+  using downloads from the GATK Broad site or Appistry (see :ref:`extra-install`).
+
+Another good source of inspiration are the configuration files from the
+:ref:`example-pipelines`, which may help identify other configuration variables
+of interest.
+
+Population calling
+==================
+
+When calling multiple samples, we recommend calling together to provide improved
+sensitivity and a fully squared off final callset. To associate samples together
+in a population add a ``metadata`` ``batch`` to the :ref:`sample-configuration`::
+
+    - description: Sample1
+      metadata:
+        batch: Batch1
+    - description: Sample2
+      metadata:
+        batch: Batch1
+
+Batching samples results in output VCFs and GEMINI databases containing
+all merged sample calls. bcbio has two methods to call samples together:
+
+- Batch or pooled calling -- This calls all samples simultaneously by feeding
+  them to the variant caller. This works for smaller batch sizes (< 50 samples)
+  as memory requirements become limiting in larger pools. This is the default
+  approach taken when you specify a ``variantcaller`` in the
+  :ref:`variant-config` configuration.
+
+- Joint calling -- This calls samples independently, then combines them together
+  into a single callset by integrating the individual calls. This scales to
+  larger population sizes by avoiding the computational bottlenecks of pooled
+  calling. Specifying a ``jointcaller`` along with the appropriate
+  ``variantcaller`` in the :ref:`variant-config` configuration enables this::
+
+    - description: Sample1
+      algorithm:
+        variantcaller: freebayes
+        jointcaller: freebayes-joint
+      metadata:
+        batch: Batch1
+    - description: Sample2
+      algorithm:
+        variantcaller: freebayes
+        jointcaller: freebayes-joint
+      metadata:
+        batch: Batch1
+
+Cancer variant calling
+~~~~~~~~~~~~~~~~~~~~~~
+bcbio supports somatic cancer calling with tumor and optionally matched normal pairs using
+multiple SNP, indel and structural variant callers. A `full evaluation of cancer calling`_
+validates callers against `synthetic dataset 3 from the ICGC-TCGA DREAM challenge`_.
+bcbio uses a majority voting ensemble approach to combining calls from
+multiple SNP and indel callers, and also flattens structural variant calls into a
+combined representation.
+
+The `example configuration <https://github.com/chapmanb/bcbio-nextgen/blob/master/config/examples/cancer-dream-syn3.yaml>`_
+for the :ref:`example-cancer` validation is a good starting point for setting up
+a tumor/normal run on your own dataset. The configuration works similarly to
+population based calling. Supply a consistent batch for tumor/normal pairs and
+mark them with the phenotype::
+
+    - description: your-tumor
+      metadata:
+        batch: batch1
+        phenotype: tumor
+    - description: your-normal
+      metadata:
+        batch: batch1
+        phenotype: normal
+
+Other :ref:`config-cancer` configuration options allow tweaking of the
+processing parameters.
+
+We're actively working on improving calling to better account for the
+heterogeneity and structural variability that define cancer genomes.
+
+.. _full evaluation of cancer calling: http://bcb.io/2015/03/05/cancerval/
+.. _synthetic dataset 3 from the ICGC-TCGA DREAM challenge: https://www.synapse.org/#!Synapse:syn312572/wiki/62018
 
 RNA-seq
 ~~~~~~~
@@ -57,7 +170,7 @@ bcbio-nextgen also implements a configurable best-practice pipeline for RNA-seq
 quality control, adapter trimming, alignment and post-alignment quantitation
 
 - Adapter trimming:
-  - `AlienTrimmer`_
+  - `cutadapt`_
 
 - Sequence alignment:
   - `tophat2`_
@@ -68,7 +181,9 @@ quality control, adapter trimming, alignment and post-alignment quantitation
   - `FastQC`_
 
 - Quantitation:
-  - `HTSeq`_
+  - `featureCounts`_
+  - `DEXSeq`_
+  - `eXpress`_
 
 After a run you will have in the ``upload`` directory a directory for each
 sample which contains a BAM file of the aligned and unaligned reads, a
@@ -84,6 +199,12 @@ about each sample and some provenance data. In that directory is also a
 differential expression calling using any count-based method such as EdgeR,
 DESeq2 or voom+limma, etc.
 
+Standard
+~~~~~~~~
+
+This pipeline implements `alignment` and `qc` tools. Furthermore, it will run `qsignature`_ to detect possible duplicated samples, or miss-labeling. It uses SNPs signature to create a distance matrix that helps easily to create groups. The project yaml file will show number of total samples analyzed, number of very similar samples, and samples that could be duplicated.
+
+.. _qsignature: http://sourceforge.net/p/adamajava/wiki/qSignature/
 
 Configuration
 =============
@@ -156,7 +277,7 @@ sample configuration file for that analysis::
     details:
       - files: [/full/path/to/control_rep1.fastq]
 	description: 'Control_rep1'
-	genome_build: GRCm38
+	genome_build: mm10
 	analysis: RNA-seq
 	algorithm:
              aligner: tophat2
@@ -165,7 +286,7 @@ sample configuration file for that analysis::
 	     adapters: [nextera, polya]
       - files: [/full/path/to/control_rep2.fastq]
 	description: 'Control_rep2'
-	genome_build: GRCm38
+	genome_build: mm10
 	analysis: RNA-seq
 	algorithm:
              aligner: tophat2
@@ -174,7 +295,7 @@ sample configuration file for that analysis::
 	     adapters: [nextera, polya]
       - files: [/full/path/to/case_rep1.fastq]
 	description: 'Case_rep1'
-	genome_build: GRCm38
+	genome_build: mm10
 	analysis: RNA-seq
 	algorithm:
              aligner: tophat2
@@ -183,7 +304,7 @@ sample configuration file for that analysis::
 	     adapters: [nextera, polya]
       - files: [/full/path/to/case_rep2.fastq]
 	description: 'Case_rep2'
-	genome_build: GRCm38
+	genome_build: mm10
 	analysis: RNA-seq
 	algorithm:
              aligner: tophat2
@@ -210,20 +331,7 @@ will be detected as paired and combined in the YAML file output by the
 templating system.
 
 
-.. _GATK best practice: http://gatkforums.broadinstitute.org/discussion/1186/best-practice-variant-detection-with-the-gatk-v4-for-release-2-0
-.. _GATK Unified Genotyper: http://www.broadinstitute.org/gatk/gatkdocs/org_broadinstitute_sting_gatk_walkers_genotyper_UnifiedGenotyper.html
-.. _GATK Haplotype caller: http://www.broadinstitute.org/gatk/gatkdocs/org_broadinstitute_sting_gatk_walkers_haplotypecaller_HaplotypeCaller.html
-.. _FreeBayes: https://github.com/ekg/freebayes
-.. _samtools mpileup: http://samtools.sourceforge.net/mpileup.shtml
-.. _cortex\_var: http://cortexassembler.sourceforge.net/index_cortex_var.html
-.. _GATK's Variant Quality Score Recalibrator: http://www.broadinstitute.org/gatk/gatkdocs/org_broadinstitute_sting_gatk_walkers_variantrecalibration_VariantRecalibrator.html
-.. _snpEff: http://snpeff.sourceforge.net/
-.. _bwa mem: http://bio-bwa.sourceforge.net/
 .. _bowtie2: http://bowtie-bio.sourceforge.net/bowtie2/index.shtml
-.. _mosaik: https://github.com/wanpinglee/MOSAIK
-.. _novoalign: http://www.novocraft.com
-.. _gkno pipelines: http://gkno.me/pipelines.html
-.. _GEMINI: http://gemini.readthedocs.org/en/latest/
 .. _tophat2: http://tophat.cbcb.umd.edu/
 .. _STAR: http://code.google.com/p/rna-star/
 .. _cutadapt: http://code.google.com/p/cutadapt/
@@ -236,6 +344,5 @@ templating system.
 .. _parameters: http://bcbio-nextgen.readthedocs.org/en/latest/contents/configuration.html
 .. _template: http://bcbio-nextgen.readthedocs.org/en/latest/contents/configuration.html#automated-sample-configuration
 .. _illumina-rnaseq: http://raw.github.com/chapmanb/bcbio-nextgen/master/config/templates/illumina-rnaseq.yaml
-.. _VarScan: http://varscan.sourceforge.net
-.. _MuTect: http://www.broadinstitute.org/cancer/cga/mutect
-.. _AlienTrimmer: http://www.ncbi.nlm.nih.gov/pubmed/23912058
+.. _eXpress: http://bio.math.berkeley.edu/eXpress/overview.html
+.. _featureCounts: http://bioinf.wehi.edu.au/featureCounts/

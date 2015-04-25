@@ -54,7 +54,7 @@ your own research.
 - `Science for Life Laboratory`_: The genomics core platform in
   the Swedish National Infrastructure (`NGI`_) for genomics, has crunched
   over 16TBp (terabasepairs) and processed almost 7000+ samples
-  from the beggining of 2013 until the end of July. `UPPMAX`_, our
+  from the beginning of 2013 until the end of July. `UPPMAX`_, our
   cluster located in Uppsala runs the pipeline in production since 2010.
 
 .. _Science for Life Laboratory: http://scilifelab.se/
@@ -76,6 +76,47 @@ your own research.
   bcbio-nextgen for targeted resequencing (using an Illumina MiSeq) to
   identify mutations and other variants in tumor samples to
   investigate their link to tumor progression, patient survival and
-  drug sensitivity and resistance.
+  drug sensitivity and resistance. A
+  `poster from the 2014 European Society of Human Genetics meeting`_
+  provides more details on usage in ovarian cancer.
 
 .. _IRCCS "Mario Negri" Institute for Pharmacological Research: http://www.marionegri.it
+.. _poster from the 2014 European Society of Human Genetics meeting: https://github.com/chapmanb/bcbb/raw/master/posters/beltrame_ESHG_poster_05_2014.reduced.pdf
+
+- `The Translational Genomics Research Institute (TGen)`_: 
+  Members of the `Huentelman lab`_ at TGen apply bcbio-nextgen to a wide 
+  variety of studies of with a major focus in the neurobiology of aging 
+  and neurodegeneration in collaboration with the The Arizona Alzheimer's Consortium (`AAC`_)
+  and  the `McKnight Brain Research Foundation`_.
+  We also use bcbio in studies of rare diseases in children through TGen's 
+  Center for Rare Childhood Disorders (`C4RCD`_),  and other rare diseases such as 
+  Multiple System Atrophy (`MSA`_). bcbio-nextgen has also been instrumental in 
+  projects for TGen's Program for Canine Health & Performance (`PCHP`_) 
+  and numerous RNA-seq projects using rodent models. Our work with bcbio 
+  started with a parnership with `Dell` and The Neuroblastoma and 
+  Medulloblastoma Translational Research Consortium (`NMTRC`_), 
+  and TGen as part of a Phase I clinical trial in these rare childhood cancers.
+
+.. _The Translational Genomics Research Institute (TGen): http://www.tgen.org
+.. _Huentelman lab: http://www.tgen.org/research/research-faculty/matt-huentelman.aspx
+.. _AAC: http://www.azalz.org
+.. _McKnight Brain Research Foundation: http://tmbrf.org  
+.. _C4RCD: http://www.c4rcd.org
+.. _MSA: http://www.tgen.org/research/multiple-system-atrophy-(msa)-research-registry.aspx
+.. _PCHP: http://www.tgen.org/research/canine-health-performance.aspx
+.. _Dell: http://www.dell.com/learn/us/en/70/healthcare
+.. _NMTRC: http://nmtrc.org/about
+   
+- `Computer Science and Artificial Intelligence Laboratory (CSAIL),
+  MIT`_: The `Gifford lab`_ uses the bcbio-nextgen pipeline to analyze
+  a variety of sequencing datasets for their research in genetics and
+  regulatory genomics (including the `SysCode`_ and
+  `stemcell.mit.edu`_ projects).  The pipeline applies
+  collaboratively-developed best practices for analysis as well as
+  computation, which enables the lab to run the pipeline on local
+  clusters and Amazon EC2.
+
+.. _Computer Science and Artificial Intelligence Laboratory (CSAIL), MIT: http://www.csail.mit.edu/
+.. _Gifford lab: http://cgs.csail.mit.edu/
+.. _SysCode: http://syscode.org/
+.. _stemcell.mit.edu: http://stemcell.mit.edu/

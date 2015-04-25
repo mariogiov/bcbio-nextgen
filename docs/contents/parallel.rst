@@ -4,7 +4,7 @@ Parallel execution
 The pipeline runs in parallel in two different ways:
 
 -  multiple cores -- Analyses will run in parallel using multiple cores
-   on a single machine. This requires only the ``mulitprocessing``
+   on a single machine. This requires only the ``multiprocessing``
    Python library, included by default with most Python installations.
 
 -  parallel messaging -- This allows scaling beyond the cores
@@ -72,17 +72,42 @@ to the underlying queue scheduler. This currently supports SGE's
 or resources to the scheduler (see the `qsub man page`_). You may specify multiple
 resources, so ``-r mem=4g -r ct=01:40:00``
 translates to ``-l mem=4g -l ct=01:40:00`` when passed to ``qsub`` or
-``-r "account=a2010002;timelimit=04:00:00"`` when using SLURM, for
+``-r "account=a2010002" -r "timelimit=04:00:00"`` when using SLURM, for
 instance. SLURM and Torque support specification of an account parameter with
 ``-r account=your_name``, which IPython transfers into ``-A``.
 
-Specify the `SGE parallel environment`_ to use for submitting multicore jobs
-with ``-r pename=your_pe``. Since this setup
-is system specific it is hard to write general code for find a
-suitable environment. Specifically, when there are multiple usable
-parallel environments, it will select the first one which may not be
-correct. Manually specifying it with a ``pename=`` flag to resources
-will ensure correct selection of the right environment.
+SGE supports special parameters passed using resources to help handle the
+heterogeneity of possible setups. Specify the `SGE parallel environment`_ to use
+for submitting multicore jobs with ``-r pename=your_pe``. Since this setup is
+system specific it is hard to write general code for find a suitable
+environment. Specifically, when there are multiple usable parallel environments,
+it will select the first one which may not be correct. Manually specifying it
+with a ``pename=`` flag to resources will ensure correct selection of the right
+environment. To specify an advanced reservation with the ``-ar`` flag, use
+``-r ar=ar_id``. To specify an alternative memory management model instead of
+``mem_free`` use ``-r memtype=approach``. It is further recommended to configure
+``mem_free`` (or any other chosen memory management model) as a consumable, requestable
+resource in SGE to prevent overfilling hosts that do not have sufficient memory per slot.
+This can be done in two steps. First, launch ``qmon`` as an admin,
+select ``Complex Configuration`` in qmon, click on ``mem_free`,
+under the ``Consumable`` dialog select ``JOB`` (instead of ``YES`` or ``NO``) and
+finally click ``Modify`` for the changes to take effect. Secondly, for each host in
+the queue, configure ``mem_free`` as a complex value. If a host called ``myngshost``
+has 128GB of RAM, the corresponding command would be
+``qconf -mattr exechost complex_values mem_free=128G myngshost``
+
+There are also special ``-r`` resources parameters to support pipeline configuration:
+
+- ``-r conmem=4`` -- Specify the memory for the controller process, in Gb. This
+  currently applies to SLURM processing and defaults to 4Gb.
+
+- ``-r mincores=16`` -- Specify the minimum number of cores to batch together
+  for parallel single core processes like variant calling. This will run
+  multiple processes together under a single submission to allow sharing of
+  resources like memory, which is helpful when a small percentage of the time a
+  process like variant calling will use a lot of memory. By default, bcbio will
+  calculate ``mincores`` based on specifications for multicore calling so this
+  doesn't normally require a user to set.
 
 .. _qsub man page: http://gridscheduler.sourceforge.net/htmlman/htmlman1/qsub.html
 .. _IPython parallel: http://ipython.org/ipython-doc/dev/index.html
@@ -170,10 +195,24 @@ with ``ulimit -a | grep open``. Setting open file handle limits is
 open system and cluster specific and below are tips for specific
 setups.
 
+In addition to open file handle limits (``ulimit -n``) large processes may also
+run into issues with available max user processes (``ulimit -u``). Some systems
+set a low soft limit (``ulimit -Su``) like 1024 but a higher hard limit
+(``ulimit -Hu``), allowing adjustment without root privileges. The IPython
+controllers and engines do this automatically, but the main ``bcbio_nextgen.py``
+driver process cannot. If this scheduler puts this process on the same node as
+worker processes, you may run into open file handle limits due to work happening
+on the workers. To fix this, manually set ``ulimit -u a_high_number`` as part of
+the submission process for the main process.
+
 For a Ubuntu system, edit ``/etc/security/limits.conf`` to set the
 soft and hard ``nofile`` descriptors, and edit
 ``/etc/pam.d/common-session`` to add ``pam_limits.so``. See
 `this blog post`_ for more details.
+
+For CentOS/RedHat systems, edit ``/etc/security/limits.conf`` and
+``/etc/security/limits.d/90-nproc.conf`` to `increase maximum open files and
+user limits <http://ithubinfo.blogspot.com/2013/07/how-to-increase-ulimit-open-file-and.html>`_.
 
 SGE needs configuration at the qmaster level. Invoke ``qconf -mconf``
 from a host with admin privileges, and edit ``execd_params``::
@@ -203,30 +242,3 @@ contribute your tips and thoughts.
 .. _post on scaling bcbio-nextgen: http://bcbio.wordpress.com/2013/05/22/scaling-variant-detection-pipelines-for-whole-genome-sequencing-analysis/
 .. _Harvard FAS Research Computing: http://rc.fas.harvard.edu/
 .. _Dell's Active Infrastructure for Life Sciences: http://dell.com/ai-hpc-lifesciences
-
-Cloud support
-~~~~~~~~~~~~~
-
-`Amazon Web Services`_ provide a flexible cloud based environment for
-running analyses. Cloud approaches offer the ability to perform
-analyses at scale with no investment in local hardware. In addition to
-the potential advantages for traditional cluster users, shared images
-on top of this infrastructure can make these analysis pipelines
-available to anyone. `This tutorial`_ describes running the pipeline
-on Amazon with `CloudBioLinux`_ and `CloudMan`_.
-
-The scripts can also be tightly integrated with the `Galaxy`_ web-based
-analysis tool. Tracking of samples occurs via a web based LIMS system,
-and processed results are uploading into Galaxy Data Libraries for
-researcher access and additional analysis. See the `installation
-instructions for the front end`_ and a `detailed description of the full
-system`_.
-
-.. _Amazon Web Services: https://aws.amazon.com/
-.. _This tutorial: http://bcbio.wordpress.com/2011/08/19/distributed-exome-analysis-pipeline-with-cloudbiolinux-and-cloudman/
-.. _CloudBioLinux: http://cloudbiolinux.org
-.. _CloudMan: http://wiki.g2.bx.psu.edu/Admin/Cloud
-
-.. _Galaxy: http://galaxy.psu.edu/
-.. _installation instructions for the front end: https://bitbucket.org/galaxy/galaxy-central/wiki/LIMS/nglims
-.. _detailed description of the full system: http://bcbio.wordpress.com/2011/01/11/next-generation-sequencing-information-management-and-analysis-system-for-galaxy/
